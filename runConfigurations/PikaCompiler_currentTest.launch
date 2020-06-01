@@ -12,7 +12,7 @@
     <booleanAttribute key="org.eclipse.jdt.launching.ATTR_USE_CLASSPATH_ONLY_JAR" value="false"/>
     <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="applications.PikaCompiler"/>
     <stringAttribute key="org.eclipse.jdt.launching.MODULE_NAME" value="pikaStudents"/>
-    <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="input/pika-1/floating.pika output"/>
+    <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="${selected_resource_loc} output"/>
     <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="pikaStudents"/>
     <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-ea"/>
 </launchConfiguration>

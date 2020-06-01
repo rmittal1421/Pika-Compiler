@@ -1,0 +1,7 @@
+exec {
+
+	const a := 2.2.
+	const b := 0.0.
+	const c := a - b.
+	print c, _n_.
+}

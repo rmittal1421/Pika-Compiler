@@ -1,0 +1,4 @@
+exec {
+	const a := 2.1 > 1.1.
+	print a, _n_.
+}

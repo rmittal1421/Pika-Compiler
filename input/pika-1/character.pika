@@ -1,0 +1,6 @@
+exec {
+	const a := ^c^.
+	const b := ^d$.
+	const c := a > b.
+	print c; _n_.
+}

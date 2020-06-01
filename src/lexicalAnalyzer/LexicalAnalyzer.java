@@ -1,6 +1,5 @@
 package lexicalAnalyzer;
 
-
 import logging.PikaLogger;
 
 import inputHandler.InputHandler;
@@ -12,6 +11,7 @@ import tokens.IdentifierToken;
 import tokens.LextantToken;
 import tokens.NullToken;
 import tokens.IntegerToken;
+import tokens.CharacterToken;
 import tokens.FloatingToken;
 import tokens.Token;
 
@@ -28,81 +28,77 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		super(input);
 	}
 
-	
 	//////////////////////////////////////////////////////////////////////////////
-	// Token-finding main dispatch	
+	// Token-finding main dispatch
 
 	@Override
 	protected Token findNextToken() {
 		LocatedChar ch = nextNonWhitespaceChar();
-		
-		while(ch.isCommentToken()) {
+
+		while (ch.isCommentToken()) {
 			ch = input.next();
-			while(!(ch.isCommentToken() || ch.isNewLine())) {
+			while (!(ch.isCommentToken() || ch.isNewLine())) {
 				ch = input.next();
 			}
 			ch = nextNonWhitespaceChar();
 		}
-		
-		if(ch.isNumberStart()) {
+
+		if (ch.isNumberStart()) {
 			return scanNumber(ch);
-		}
-		else if(ch.isLowerCase()) {
+		} else if (ch.isCharacterSymbol()) {
+			return scanCharacter(ch);
+		} else if (ch.isIdentifierStart()) {
 			return scanIdentifier(ch);
-		}
-		else if(isPunctuatorStart(ch)) {
+		} else if (isPunctuatorStart(ch)) {
 			return PunctuatorScanner.scan(ch, input);
-		}
-		else if(isEndOfInput(ch)) {
+		} else if (isEndOfInput(ch)) {
 			return NullToken.make(ch.getLocation());
-		}
-		else {
+		} else {
 			lexicalError(ch);
 			return findNextToken();
 		}
 	}
 
-
 	private LocatedChar nextNonWhitespaceChar() {
 		LocatedChar ch = input.next();
-		while(ch.isWhitespace()) {
+		while (ch.isWhitespace()) {
 			ch = input.next();
 		}
 		return ch;
 	}
-	
-	
+
 	//////////////////////////////////////////////////////////////////////////////
-	// Integer lexical analysis	
+	// Integer lexical analysis
 
 	private Token scanNumber(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
-		
+
 		LocatedChar next = input.peek();
-		if(firstChar.isNumericSign() && !next.isDigit() && !next.isDecimalPoint()) {
+		if (firstChar.isNumericSign() && !next.isDigit() && !next.isDecimalPoint()) {
 			return PunctuatorScanner.scan(firstChar, input);
 		}
-		
+
 		buffer.append(firstChar.getCharacter());
-		
-		if(firstChar.isDigit() || firstChar.isNumericSign()) {
+
+		if (firstChar.isDigit() || firstChar.isNumericSign()) {
 			appendSubsequentDigits(buffer);
-			
+
 			next = input.next();
 			LocatedChar secondNext = input.peek();
-			
-			if(next.isDecimalPoint() && secondNext.isDigit()) {
+
+			// TODO: Handle the case where the floating number starts with .
+			if (next.isDecimalPoint() && secondNext.isDigit()) {
 				// It is a floating number
 				buffer.append(next.getCharacter());
 				appendSubsequentDigits(buffer);
-				
-				if(input.peek().getCharacter() == 'E') {
+
+				if (input.peek().getCharacter() == 'E') {
 					buffer.append(input.next().getCharacter());
-					if(input.peek().isNumericSign()) {
+					if (input.peek().isNumericSign()) {
 						buffer.append(input.next().getCharacter());
-					} 
-					
-					if(input.peek().isDigit()) {
+					}
+
+					if (input.peek().isDigit()) {
 						// The floating number with E is in correct format
 						appendSubsequentDigits(buffer);
 					} else {
@@ -117,68 +113,105 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 			input.pushback(next);
 		}
 		return IntegerToken.make(firstChar.getLocation(), buffer.toString());
-		
-//		if(firstChar.isDigit() || firstChar.isNumericSign()) {
-//			appendSubsequentDigits(buffer);
-//			next = input.next();
-//			LocatedChar secondNext = input.peek();
-//			if(!next.isDecimalPoint() && secondNext.isDigit()) {
-//				input.pushback(next);
-//				return IntegerToken.make(firstChar.getLocation(), buffer.toString());
-//			}
-//			buffer.append(next);
-//		}
-//		
-//		appendSubsequentDigits(buffer);
-//		
-//		return IntegerToken.make(firstChar.getLocation(), buffer.toString());
 	}
+
 	private void appendSubsequentDigits(StringBuffer buffer) {
 		LocatedChar c = input.next();
-		while(c.isDigit()) {
+		while (c.isDigit()) {
 			buffer.append(c.getCharacter());
 			c = input.next();
 		}
 		input.pushback(c);
 	}
-	
-	
+
 	//////////////////////////////////////////////////////////////////////////////
-	// Identifier and keyword lexical analysis	
+	// Identifier and keyword lexical analysis
 
 	private Token scanIdentifier(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append(firstChar.getCharacter());
-		appendSubsequentLowercase(buffer);
+//		appendSubsequentLowercase(buffer);
+		appendSubsequentIdentifierCharacters(buffer);
 
 		String lexeme = buffer.toString();
-		if(Keyword.isAKeyword(lexeme)) {
+		if (Keyword.isAKeyword(lexeme)) {
 			return LextantToken.make(firstChar.getLocation(), lexeme, Keyword.forLexeme(lexeme));
-		}
-		else {
+		} else {
 			return IdentifierToken.make(firstChar.getLocation(), lexeme);
 		}
 	}
-	private void appendSubsequentLowercase(StringBuffer buffer) {
+
+//	TODO: Remove this code
+//	private void appendSubsequentLowercase(StringBuffer buffer) {
+//		LocatedChar c = input.next();
+//		while (c.isLowerCase()) {
+//			buffer.append(c.getCharacter());
+//			c = input.next();
+//		}
+//		input.pushback(c);
+//	}
+	private void appendSubsequentIdentifierCharacters(StringBuffer buffer) {
+		int identifierLength = buffer.length();
+		
 		LocatedChar c = input.next();
-		while(c.isLowerCase()) {
+		LocatedChar faultyChar = c;
+		
+		if(c.isIdentifierStart()) {
 			buffer.append(c.getCharacter());
+			identifierLength++;
 			c = input.next();
+			
+			while(c.isValidIdentifierCharacter()) {
+				buffer.append(c.getCharacter());
+				identifierLength++;
+				
+				if(identifierLength == 33) {
+					faultyChar = c;
+				}
+				c = input.next();
+			}
 		}
 		input.pushback(c);
+		
+		if(identifierLength > 32) {
+			lexicalErrorIdentifier(faultyChar);
+		}
 	}
-	
-	
+
+	private Token scanCharacter(LocatedChar firstChar) {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append(firstChar.getCharacter());
+		appendSubsequentCharacterToken(buffer);
+
+		String lexeme = buffer.toString();
+		return CharacterToken.make(firstChar.getLocation(), lexeme);
+	}
+
+	private void appendSubsequentCharacterToken(StringBuffer buffer) {
+		LocatedChar c = input.next();
+		if (c.isCharacter()) {
+			buffer.append(c.getCharacter());
+			c = input.peek();
+
+			if (c.isCharacterSymbol()) {
+				buffer.append(input.next().getCharacter());
+			} else {
+				// TODO: Throw error in the correct manner if this is not correct
+				throw new IllegalArgumentException("bad LocatedChar " + c + "in character initialization");
+			}
+		}
+	}
+
 	//////////////////////////////////////////////////////////////////////////////
-	// Punctuator lexical analysis	
+	// Punctuator lexical analysis
 	// old method left in to show a simple scanning method.
 	// current method is the algorithm object PunctuatorScanner.java
 
 	@SuppressWarnings("unused")
 	private Token oldScanPunctuator(LocatedChar ch) {
 		TextLocation location = ch.getLocation();
-		
-		switch(ch.getCharacter()) {
+
+		switch (ch.getCharacter()) {
 		case '*':
 			return LextantToken.make(location, "*", Punctuator.MULTIPLY);
 		case '+':
@@ -186,10 +219,9 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		case '>':
 			return LextantToken.make(location, ">", Punctuator.GREATER);
 		case ':':
-			if(ch.getCharacter()=='=') {
+			if (ch.getCharacter() == '=') {
 				return LextantToken.make(location, ":=", Punctuator.ASSIGN);
-			}
-			else {
+			} else {
 				throw new IllegalArgumentException("found : not followed by = in scanOperator");
 			}
 		case ',':
@@ -201,10 +233,8 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		}
 	}
 
-	
-
 	//////////////////////////////////////////////////////////////////////////////
-	// Character-classification routines specific to Pika scanning.	
+	// Character-classification routines specific to Pika scanning.
 
 	private boolean isPunctuatorStart(LocatedChar lc) {
 		char c = lc.getCharacter();
@@ -214,15 +244,18 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 	private boolean isEndOfInput(LocatedChar lc) {
 		return lc == LocatedCharStream.FLAG_END_OF_INPUT;
 	}
-	
-	
+
 	//////////////////////////////////////////////////////////////////////////////
-	// Error-reporting	
+	// Error-reporting
 
 	private void lexicalError(LocatedChar ch) {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: invalid character " + ch);
 	}
-
 	
+	private void lexicalErrorIdentifier(LocatedChar ch) {
+		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
+		log.severe("Lexical error: identifier length exceeded than 32 at invalid character " + ch);
+	}
+
 }

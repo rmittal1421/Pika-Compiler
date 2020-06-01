@@ -1,0 +1,4 @@
+exec {
+	const abcdabcdabcdabcdabcdabcdabcdabcde := 1.
+	print abcdabcdabcdabcdabcdabcdabcdabcde; _n_.
+}

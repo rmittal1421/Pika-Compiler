@@ -11,6 +11,7 @@ import lexicalAnalyzer.Punctuator;
 import parseTree.*;
 import parseTree.nodeTypes.BinaryOperatorNode;
 import parseTree.nodeTypes.BooleanConstantNode;
+import parseTree.nodeTypes.CharacterConstantNode;
 import parseTree.nodeTypes.MainBlockNode;
 import parseTree.nodeTypes.DeclarationNode;
 import parseTree.nodeTypes.FloatingConstantNode;
@@ -35,142 +36,147 @@ public class ASMCodeGenerator {
 		ASMCodeGenerator codeGenerator = new ASMCodeGenerator(syntaxTree);
 		return codeGenerator.makeASM();
 	}
+
 	public ASMCodeGenerator(ParseNode root) {
 		super();
 		this.root = root;
 	}
-	
+
 	public ASMCodeFragment makeASM() {
 		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
-		
-		code.append( RunTime.getEnvironment() );
-		code.append( globalVariableBlockASM() );
-		code.append( programASM() );
+
+		code.append(RunTime.getEnvironment());
+		code.append(globalVariableBlockASM());
+		code.append(programASM());
 //		code.append( MemoryManager.codeForAfterApplication() );
-		
+
 		return code;
 	}
+
 	private ASMCodeFragment globalVariableBlockASM() {
 		assert root.hasScope();
 		Scope scope = root.getScope();
 		int globalBlockSize = scope.getAllocatedSize();
-		
+
 		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
 		code.add(DLabel, RunTime.GLOBAL_MEMORY_BLOCK);
 		code.add(DataZ, globalBlockSize);
 		return code;
 	}
+
 	private ASMCodeFragment programASM() {
 		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
-		
-		code.add(    Label, RunTime.MAIN_PROGRAM_LABEL);
-		code.append( programCode());
-		code.add(    Halt );
-		
+
+		code.add(Label, RunTime.MAIN_PROGRAM_LABEL);
+		code.append(programCode());
+		code.add(Halt);
+
 		return code;
 	}
+
 	private ASMCodeFragment programCode() {
 		CodeVisitor visitor = new CodeVisitor();
 		root.accept(visitor);
 		return visitor.removeRootCode(root);
 	}
 
-
 	protected class CodeVisitor extends ParseNodeVisitor.Default {
 		private Map<ParseNode, ASMCodeFragment> codeMap;
 		ASMCodeFragment code;
-		
+
 		public CodeVisitor() {
 			codeMap = new HashMap<ParseNode, ASMCodeFragment>();
 		}
 
-
 		////////////////////////////////////////////////////////////////////
-        // Make the field "code" refer to a new fragment of different sorts.
+		// Make the field "code" refer to a new fragment of different sorts.
 		private void newAddressCode(ParseNode node) {
 			code = new ASMCodeFragment(GENERATES_ADDRESS);
 			codeMap.put(node, code);
 		}
+
 		private void newValueCode(ParseNode node) {
 			code = new ASMCodeFragment(GENERATES_VALUE);
 			codeMap.put(node, code);
 		}
+
 		private void newVoidCode(ParseNode node) {
 			code = new ASMCodeFragment(GENERATES_VOID);
 			codeMap.put(node, code);
 		}
 
-	    ////////////////////////////////////////////////////////////////////
-        // Get code from the map.
+		////////////////////////////////////////////////////////////////////
+		// Get code from the map.
 		private ASMCodeFragment getAndRemoveCode(ParseNode node) {
 			ASMCodeFragment result = codeMap.get(node);
 			codeMap.remove(result);
 			return result;
 		}
-	    public  ASMCodeFragment removeRootCode(ParseNode tree) {
+
+		public ASMCodeFragment removeRootCode(ParseNode tree) {
 			return getAndRemoveCode(tree);
-		}		
+		}
+
 		ASMCodeFragment removeValueCode(ParseNode node) {
 			ASMCodeFragment frag = getAndRemoveCode(node);
 			makeFragmentValueCode(frag, node);
 			return frag;
-		}		
+		}
+
 		private ASMCodeFragment removeAddressCode(ParseNode node) {
 			ASMCodeFragment frag = getAndRemoveCode(node);
 			assert frag.isAddress();
 			return frag;
-		}		
+		}
+
 		ASMCodeFragment removeVoidCode(ParseNode node) {
 			ASMCodeFragment frag = getAndRemoveCode(node);
 			assert frag.isVoid();
 			return frag;
 		}
-		
-	    ////////////////////////////////////////////////////////////////////
-        // convert code to value-generating code.
+
+		////////////////////////////////////////////////////////////////////
+		// convert code to value-generating code.
 		private void makeFragmentValueCode(ASMCodeFragment code, ParseNode node) {
 			assert !code.isVoid();
-			
-			if(code.isAddress()) {
+
+			if (code.isAddress()) {
 				turnAddressIntoValue(code, node);
-			}	
-		}
-		private void turnAddressIntoValue(ASMCodeFragment code, ParseNode node) {
-			if(node.getType() == PrimitiveType.INTEGER) {
-				code.add(LoadI);
-			}	
-			else if(node.getType() == PrimitiveType.FLOATING) {
-				code.add(LoadF);
 			}
-			else if(node.getType() == PrimitiveType.BOOLEAN) {
+		}
+
+		private void turnAddressIntoValue(ASMCodeFragment code, ParseNode node) {
+			if (node.getType() == PrimitiveType.INTEGER) {
+				code.add(LoadI);
+			} else if (node.getType() == PrimitiveType.FLOATING) {
+				code.add(LoadF);
+			} else if (node.getType() == PrimitiveType.BOOLEAN || node.getType() == PrimitiveType.CHARACTER) {
 				code.add(LoadC);
-			}	
-			else {
+			} else {
 				assert false : "node " + node;
 			}
 			code.markAsValue();
 		}
-		
-	    ////////////////////////////////////////////////////////////////////
-        // ensures all types of ParseNode in given AST have at least a visitLeave	
+
+		////////////////////////////////////////////////////////////////////
+		// ensures all types of ParseNode in given AST have at least a visitLeave
 		public void visitLeave(ParseNode node) {
 			assert false : "node " + node + " not handled in ASMCodeGenerator";
 		}
-		
-		
-		
+
 		///////////////////////////////////////////////////////////////////////////
 		// constructs larger than statements
 		public void visitLeave(ProgramNode node) {
 			newVoidCode(node);
-			for(ParseNode child : node.getChildren()) {
+			for (ParseNode child : node.getChildren()) {
 				ASMCodeFragment childCode = removeVoidCode(child);
 				code.append(childCode);
 			}
 		}
+
 		public void visitLeave(MainBlockNode node) {
 			newVoidCode(node);
-			for(ParseNode child : node.getChildren()) {
+			for (ParseNode child : node.getChildren()) {
 				ASMCodeFragment childCode = removeVoidCode(child);
 				code.append(childCode);
 			}
@@ -181,81 +187,97 @@ public class ASMCodeGenerator {
 
 		public void visitLeave(PrintStatementNode node) {
 			newVoidCode(node);
-			new PrintStatementGenerator(code, this).generate(node);	
+			new PrintStatementGenerator(code, this).generate(node);
 		}
+
 		public void visit(NewlineNode node) {
 			newVoidCode(node);
 			code.add(PushD, RunTime.NEWLINE_PRINT_FORMAT);
 			code.add(Printf);
 		}
+
 		public void visit(SpaceNode node) {
 			newVoidCode(node);
 			code.add(PushD, RunTime.SPACE_PRINT_FORMAT);
 			code.add(Printf);
 		}
-		
 
 		public void visitLeave(DeclarationNode node) {
 			newVoidCode(node);
-			ASMCodeFragment lvalue = removeAddressCode(node.child(0));	
+			ASMCodeFragment lvalue = removeAddressCode(node.child(0));
 			ASMCodeFragment rvalue = removeValueCode(node.child(1));
-			
+
 			code.append(lvalue);
 			code.append(rvalue);
-			
+
 			Type type = node.getType();
 			code.add(opcodeForStore(type));
 		}
+
 		private ASMOpcode opcodeForStore(Type type) {
-			if(type == PrimitiveType.INTEGER) {
+			if (type == PrimitiveType.INTEGER) {
 				return StoreI;
 			}
-			if(type == PrimitiveType.FLOATING) {
+			if (type == PrimitiveType.FLOATING) {
 				return StoreF;
 			}
-			if(type == PrimitiveType.BOOLEAN) {
+			if (type == PrimitiveType.BOOLEAN  || type == PrimitiveType.CHARACTER) {
 				return StoreC;
 			}
-			assert false: "Type " + type + " unimplemented in opcodeForStore()";
+			assert false : "Type " + type + " unimplemented in opcodeForStore()";
 			return null;
 		}
-
 
 		///////////////////////////////////////////////////////////////////////////
 		// expressions
 		public void visitLeave(BinaryOperatorNode node) {
 			Lextant operator = node.getOperator();
 
-			if(operator == Punctuator.GREATER) {
+			if (operator == Punctuator.GREATER) {
 				visitComparisonOperatorNode(node, operator);
-			}
-			else {
+			} else {
 				visitNormalBinaryOperatorNode(node);
 			}
 		}
-		private void visitComparisonOperatorNode(BinaryOperatorNode node,
-				Lextant operator) {
+
+		private void visitComparisonOperatorNode(BinaryOperatorNode node, Lextant operator) {
 
 			ASMCodeFragment arg1 = removeValueCode(node.child(0));
 			ASMCodeFragment arg2 = removeValueCode(node.child(1));
-			
+
 			Labeller labeller = new Labeller("compare");
-			
+
 			String startLabel = labeller.newLabel("arg1");
-			String arg2Label  = labeller.newLabel("arg2");
-			String subLabel   = labeller.newLabel("sub");
-			String trueLabel  = labeller.newLabel("true");
+			String arg2Label = labeller.newLabel("arg2");
+			String subLabel = labeller.newLabel("sub");
+			String trueLabel = labeller.newLabel("true");
 			String falseLabel = labeller.newLabel("false");
-			String joinLabel  = labeller.newLabel("join");
-			
+			String joinLabel = labeller.newLabel("join");
+
 			newValueCode(node);
 			code.add(Label, startLabel);
 			code.append(arg1);
 			code.add(Label, arg2Label);
 			code.append(arg2);
 			code.add(Label, subLabel);
+
+			assert (node.child(0).getType() == node.child(1).getType());
+
+			// TODO: Change this check to a better check. For now, its ok.
+			if (node.child(0).getType() == PrimitiveType.FLOATING) {
+				code.add(FSubtract);
+
+				code.add(JumpFPos, trueLabel);
+				code.add(Jump, falseLabel);
+			} else {
+				code.add(Subtract);
+
+				code.add(JumpPos, trueLabel);
+				code.add(Jump, falseLabel);
+			}
+
 			code.add(Subtract);
-			
+
 			code.add(JumpPos, trueLabel);
 			code.add(Jump, falseLabel);
 
@@ -268,23 +290,41 @@ public class ASMCodeGenerator {
 			code.add(Label, joinLabel);
 
 		}
+
 		private void visitNormalBinaryOperatorNode(BinaryOperatorNode node) {
 			newValueCode(node);
 			ASMCodeFragment arg1 = removeValueCode(node.child(0));
 			ASMCodeFragment arg2 = removeValueCode(node.child(1));
-			
+
 			code.append(arg1);
 			code.append(arg2);
-			
-			ASMOpcode opcode = opcodeForOperator(node.getOperator());
-			code.add(opcode);							// type-dependent! (opcode is different for floats and for ints)
+
+			Object variant = node.getSignature().getVariant();
+			if (variant instanceof ASMOpcode) {
+				ASMOpcode opcode = (ASMOpcode) variant;
+				code.add(opcode);
+			} else if (variant instanceof SimpleCodeGenerator) {
+				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
+				ASMCodeFragment fragment = generator.generate(node);
+				code.append(fragment);
+				
+				if(fragment.isAddress()) { 
+					// Which means that the fragment returns a pointer
+					code.markAsAddress(); // Now we know that this code is a pointer
+				}
+			} else {
+				// TODO: throw exception
+			}
 		}
+
 		private ASMOpcode opcodeForOperator(Lextant lextant) {
-			assert(lextant instanceof Punctuator);
-			Punctuator punctuator = (Punctuator)lextant;
-			switch(punctuator) {
-			case ADD: 	   		return Add;				// type-dependent!
-			case MULTIPLY: 		return Multiply;		// type-dependent!
+			assert (lextant instanceof Punctuator);
+			Punctuator punctuator = (Punctuator) lextant;
+			switch (punctuator) {
+			case ADD:
+				return Add; // type-dependent!
+			case MULTIPLY:
+				return Multiply; // type-dependent!
 			default:
 				assert false : "unimplemented operator in opcodeForOperator";
 			}
@@ -297,21 +337,30 @@ public class ASMCodeGenerator {
 			newValueCode(node);
 			code.add(PushI, node.getValue() ? 1 : 0);
 		}
+
 		public void visit(IdentifierNode node) {
 			newAddressCode(node);
 			Binding binding = node.getBinding();
-			
+
 			binding.generateAddress(code);
-		}		
+		}
+
 		public void visit(IntegerConstantNode node) {
+			newValueCode(node);
+
+			code.add(PushI, node.getValue());
+		}
+
+		public void visit(FloatingConstantNode node) {
+			newValueCode(node);
+
+			code.add(PushF, node.getValue());
+		}
+		
+		public void visit(CharacterConstantNode node) {
 			newValueCode(node);
 			
 			code.add(PushI, node.getValue());
-		}
-		public void visit (FloatingConstantNode node) {
-			newValueCode(node);
-			
-			code.add(PushF, node.getValue());
 		}
 	}
 

@@ -7,6 +7,7 @@ public class RunTime {
 	public static final String INTEGER_PRINT_FORMAT   = "$print-format-integer";
 	public static final String FLOATING_PRINT_FORMAT   = "$print-format-floating";
 	public static final String BOOLEAN_PRINT_FORMAT   = "$print-format-boolean";
+	public static final String CHARACTER_PRINT_FORMAT = "$print-format-character";
 	public static final String NEWLINE_PRINT_FORMAT   = "$print-format-newline";
 	public static final String SPACE_PRINT_FORMAT     = "$print-format-space";
 	public static final String BOOLEAN_TRUE_STRING    = "$boolean-true-string";
@@ -17,6 +18,7 @@ public class RunTime {
 	
 	public static final String GENERAL_RUNTIME_ERROR = "$$general-runtime-error";
 	public static final String INTEGER_DIVIDE_BY_ZERO_RUNTIME_ERROR = "$$i-divide-by-zero";
+	public static final String FLOATING_DIVIDE_BY_ZERO_RUNTIME_ERROR = "$$-divide-by-zero";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
@@ -41,6 +43,8 @@ public class RunTime {
 		frag.add(DataS, "%d");
 		frag.add(DLabel, FLOATING_PRINT_FORMAT);
 		frag.add(DataS, "%g");
+		frag.add(DLabel, CHARACTER_PRINT_FORMAT);
+		frag.add(DataS, "%c");
 		frag.add(DLabel, BOOLEAN_PRINT_FORMAT);
 		frag.add(DataS, "%s");
 		frag.add(DLabel, NEWLINE_PRINT_FORMAT);
@@ -61,6 +65,7 @@ public class RunTime {
 		
 		generalRuntimeError(frag);
 		integerDivideByZeroError(frag);
+		floatingDivideByZeroError(frag);
 		
 		return frag;
 	}
@@ -84,6 +89,16 @@ public class RunTime {
 		
 		frag.add(Label, INTEGER_DIVIDE_BY_ZERO_RUNTIME_ERROR);
 		frag.add(PushD, intDivideByZeroMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	private void floatingDivideByZeroError(ASMCodeFragment frag) {
+		String floatingDivideByZeroMessage = "$errors-floating-divide-by-zero";
+		
+		frag.add(DLabel, floatingDivideByZeroMessage);
+		frag.add(DataS, "floating divide by zero");
+		
+		frag.add(Label, FLOATING_DIVIDE_BY_ZERO_RUNTIME_ERROR);
+		frag.add(PushD, floatingDivideByZeroMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 	

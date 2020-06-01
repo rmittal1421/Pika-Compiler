@@ -1,0 +1,5 @@
+exec {
+	const a := -1.
+	const b := +1 + a.
+	print a; b; a + b;_n_.
+}

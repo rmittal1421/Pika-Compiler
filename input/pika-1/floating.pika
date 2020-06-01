@@ -1,5 +1,21 @@
 exec {
-	const avogadro := 6.022E+23.
-	const pi := 3.14159. 
-	print avogadro; pi, _n_.
+	# Integer testing
+	
+	const a := 1.
+	const b := -2.
+	const c := a + b.
+	const d := b * c.
+	const e := b > d.
+	print a; b; c; d; e, _n_. # Should print 1 2 3 6 false 
+
+
+	# Float testing
+	
+	const f := -1.101E12.
+	const g := -1.12.
+	const pi := 3.14519.
+	const h := g + pi.
+	const i := pi * pi.
+	const j := pi > g.
+	print f; g; h; i; j, _n_. # Should print +1.101E12 -1.12 2.02519 9.8922201 true
 }

@@ -4,10 +4,11 @@ import java.util.Arrays;
 
 import logging.PikaLogger;
 import parseTree.*;
+import parseTree.nodeTypes.AssignmentStatementNode;
 import parseTree.nodeTypes.BinaryOperatorNode;
 import parseTree.nodeTypes.BooleanConstantNode;
 import parseTree.nodeTypes.CharacterConstantNode;
-import parseTree.nodeTypes.MainBlockNode;
+import parseTree.nodeTypes.BlockStatementNode;
 import parseTree.nodeTypes.DeclarationNode;
 import parseTree.nodeTypes.ErrorNode;
 import parseTree.nodeTypes.FloatingConstantNode;
@@ -46,7 +47,7 @@ public class Parser {
 
 	////////////////////////////////////////////////////////////
 	// "program" is the start symbol S
-	// S -> EXEC mainBlock
+	// S -> EXEC blockStatement
 	
 	private ParseNode parseProgram() {
 		if(!startsProgram(nowReading)) {
@@ -55,8 +56,8 @@ public class Parser {
 		ParseNode program = new ProgramNode(nowReading);
 		
 		expect(Keyword.EXEC);
-		ParseNode mainBlock = parseMainBlock();
-		program.appendChild(mainBlock);
+		ParseNode blockStatement = parseBlockStatement();
+		program.appendChild(blockStatement);
 		
 		if(!(nowReading instanceof NullToken)) {
 			return syntaxErrorNode("end of program");
@@ -70,24 +71,24 @@ public class Parser {
 	
 	
 	///////////////////////////////////////////////////////////
-	// mainBlock
+	// blockStatement
 	
-	// mainBlock -> { statement* }
-	private ParseNode parseMainBlock() {
-		if(!startsMainBlock(nowReading)) {
+	// blockStatement -> { statement* }
+	private ParseNode parseBlockStatement() {
+		if(!startsBlockStatement(nowReading)) {
 			return syntaxErrorNode("mainBlock");
 		}
-		ParseNode mainBlock = new MainBlockNode(nowReading);
+		ParseNode blockStatement = new BlockStatementNode(nowReading);
 		expect(Punctuator.OPEN_BRACE);
 		
 		while(startsStatement(nowReading)) {
 			ParseNode statement = parseStatement();
-			mainBlock.appendChild(statement);
+			blockStatement.appendChild(statement);
 		}
 		expect(Punctuator.CLOSE_BRACE);
-		return mainBlock;
+		return blockStatement;
 	}
-	private boolean startsMainBlock(Token token) {
+	private boolean startsBlockStatement(Token token) {
 		return token.isLextant(Punctuator.OPEN_BRACE);
 	}
 	
@@ -95,7 +96,7 @@ public class Parser {
 	///////////////////////////////////////////////////////////
 	// statements
 	
-	// statement-> declaration | printStmt
+	// statement-> declaration | printStmt | assignmentStatement | blockStatement
 	private ParseNode parseStatement() {
 		if(!startsStatement(nowReading)) {
 			return syntaxErrorNode("statement");
@@ -106,11 +107,47 @@ public class Parser {
 		if(startsPrintStatement(nowReading)) {
 			return parsePrintStatement();
 		}
+		if(startsBlockStatement(nowReading)) {
+			return parseBlockStatement();
+		}
+		if(startsAssignmentStatement(nowReading)) {
+			return parseAssignmentStatement();
+		}
 		return syntaxErrorNode("statement");
 	}
 	private boolean startsStatement(Token token) {
 		return startsPrintStatement(token) ||
-			   startsDeclaration(token);
+			   startsDeclaration(token) ||
+			   startsBlockStatement(token) ||
+			   startsAssignmentStatement(token);
+	}
+	
+	// assignmentStatement -> target := expr .
+	private ParseNode parseAssignmentStatement() {
+		if(!startsAssignmentStatement(nowReading)) {
+			return syntaxErrorNode("assignment statement");
+		}
+		ParseNode target = parseTarget();
+		Token assnToken = nowReading; 
+		expect(Punctuator.ASSIGN);
+		ParseNode expr = parseExpression();
+		expect(Punctuator.TERMINATOR);
+		
+		return AssignmentStatementNode.withChildren(assnToken, target, expr);
+	}
+	private boolean startsAssignmentStatement(Token token) {
+		return startsTarget(token);
+	}
+	
+	// target -> identifier
+	private ParseNode parseTarget() {
+		if(!startsTarget(nowReading)) {
+			return syntaxErrorNode("target");
+		}
+		return parseIdentifier();
+	}
+	private boolean startsTarget(Token token) {
+		return startsIdentifier(token);
 	}
 	
 	// printStmt -> PRINT printExpressionList .
@@ -190,7 +227,7 @@ public class Parser {
 	}
 	
 	
-	// declaration -> CONST identifier := expression .
+	// declaration -> (CONST | VAR) identifier := expression .
 	private ParseNode parseDeclaration() {
 		if(!startsDeclaration(nowReading)) {
 			return syntaxErrorNode("declaration");
@@ -206,7 +243,7 @@ public class Parser {
 		return DeclarationNode.withChildren(declarationToken, identifier, initializer);
 	}
 	private boolean startsDeclaration(Token token) {
-		return token.isLextant(Keyword.CONST);
+		return token.isLextant(Keyword.CONST, Keyword.VAR);
 	}
 
 
@@ -270,7 +307,7 @@ public class Parser {
 		return left;
 	}
 	private boolean startsAdditiveExpression(Token token) {
-		return startsLiteral(token);
+		return startsMultiplicativeExpression(token);
 	}	
 
 	// multiplicativeExpression -> atomicExpression [MULT atomicExpression]*  (left-assoc)
@@ -304,7 +341,7 @@ public class Parser {
 		return startsLiteral(token);
 	}
 	
-	// literal -> integer | float | identifier | booleanConstant
+	// literal -> integer | float | identifier | booleanConstant | string
 	private ParseNode parseLiteral() {
 		if(!startsLiteral(nowReading)) {
 			return syntaxErrorNode("literal");

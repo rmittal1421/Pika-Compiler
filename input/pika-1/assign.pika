@@ -1,0 +1,10 @@
+exec {
+	var variable := 1.
+	variable := variable + 2.
+	print variable; _n_.
+	
+	const variable2 := variable.
+	variable := variable2 - 1 + 1.
+	var variable2 := variable == variable2.
+	print variable; variable2; variable3, _n_.
+}

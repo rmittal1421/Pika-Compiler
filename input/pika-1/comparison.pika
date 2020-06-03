@@ -1,0 +1,23 @@
+exec {
+	const a := 2.1.
+	const b := 1.1.
+	const c := a > b.
+	print c, _n_.
+	
+	const d := 3.1.
+	const e := 5.1.
+	const f := e < d.
+	print f, _n_.
+	
+	const m := 4.
+	const n := 4.
+	const o := m <= n.
+	print o, _n_.
+	
+	const ab := ^r^.
+	const cd := ^d^.
+	
+	print ab > cd; ab >= cd; cd < ab; cd <= ab, _n_. # true true true true
+	print ab == cd; ab != cd, _n_. # false true
+	print a == b; b == a - 1.0, _n_. # false true
+}

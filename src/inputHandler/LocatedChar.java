@@ -96,4 +96,10 @@ public class LocatedChar {
 	public boolean isValidIdentifierCharacter() {
 		return isIdentifierStart() || isDigit() || (character == '$');
 	}
+	public boolean isStringSymbol() {
+		return character == '"';
+	}
+	public boolean isStringTerminator() {
+		return isStringSymbol() || isNewLine();
+	}
 }

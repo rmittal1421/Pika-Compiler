@@ -1,0 +1,10 @@
+exec {
+	const a := "Raghav is awesome".
+	const b := "Diksha is awesome too".
+	print a, _n_, b, _n_.
+	
+	const s1 := "str".
+	const s2 := "str".
+	const s3 := s1.
+	print s1 != s2; s1 == s3, _n_.
+}

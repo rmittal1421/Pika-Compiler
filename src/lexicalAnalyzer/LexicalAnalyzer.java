@@ -10,6 +10,7 @@ import inputHandler.TextLocation;
 import tokens.IdentifierToken;
 import tokens.LextantToken;
 import tokens.NullToken;
+import tokens.StringToken;
 import tokens.IntegerToken;
 import tokens.CharacterToken;
 import tokens.FloatingToken;
@@ -49,6 +50,8 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 			return scanCharacter(ch);
 		} else if (ch.isIdentifierStart()) {
 			return scanIdentifier(ch);
+		} else if (ch.isStringSymbol()) {
+			return scanString(ch);
 		} else if (isPunctuatorStart(ch)) {
 			return PunctuatorScanner.scan(ch, input);
 		} else if (isEndOfInput(ch)) {
@@ -152,28 +155,22 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 //	}
 	private void appendSubsequentIdentifierCharacters(StringBuffer buffer) {
 		int identifierLength = buffer.length();
-		
+
 		LocatedChar c = input.next();
 		LocatedChar faultyChar = c;
 		
-		if(c.isIdentifierStart()) {
+		while(c.isValidIdentifierCharacter()) {
 			buffer.append(c.getCharacter());
 			identifierLength++;
-			c = input.next();
 			
-			while(c.isValidIdentifierCharacter()) {
-				buffer.append(c.getCharacter());
-				identifierLength++;
-				
-				if(identifierLength == 33) {
-					faultyChar = c;
-				}
-				c = input.next();
+			if(identifierLength == 33) {
+				faultyChar = c;
 			}
+			c = input.next();
 		}
 		input.pushback(c);
-		
-		if(identifierLength > 32) {
+
+		if (identifierLength > 32) {
 			lexicalErrorIdentifier(faultyChar);
 		}
 	}
@@ -199,6 +196,27 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 				// TODO: Throw error in the correct manner if this is not correct
 				throw new IllegalArgumentException("bad LocatedChar " + c + "in character initialization");
 			}
+		}
+	}
+	
+	private Token scanString(LocatedChar firstChar) {
+		StringBuffer buffer = new StringBuffer();
+		appendSubsequentStringCharacters(buffer);
+		
+		String lexeme = buffer.toString();
+		return StringToken.make(firstChar.getLocation(), lexeme);
+	}
+	
+	private void appendSubsequentStringCharacters(StringBuffer buffer) {
+		LocatedChar c = input.next();
+		
+		while(!c.isStringTerminator()) {
+			buffer.append(c.getCharacter());
+			c = input.next();
+		}
+		if(!c.isStringSymbol()) {
+			//String is ended by endline which should be an error
+			lexicalErrorString(c);
 		}
 	}
 
@@ -252,10 +270,15 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: invalid character " + ch);
 	}
-	
+
 	private void lexicalErrorIdentifier(LocatedChar ch) {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: identifier length exceeded than 32 at invalid character " + ch);
+	}
+	
+	private void lexicalErrorString(LocatedChar ch) {
+		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
+		log.severe("Lexical error: String token contains an unexpected character " + ch);
 	}
 
 }

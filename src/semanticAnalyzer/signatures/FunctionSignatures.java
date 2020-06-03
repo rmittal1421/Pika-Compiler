@@ -93,9 +93,7 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 				new FunctionSignature(new FloatingDivideCodeGenerator(), PrimitiveType.FLOATING, PrimitiveType.FLOATING,
 						PrimitiveType.FLOATING));
 
-		Punctuator[] comparisons = { Punctuator.GREATER };
-
-		for (Punctuator comparison : comparisons) {
+		for (Punctuator comparison : Punctuator.ComparisonOperators) {
 			FunctionSignature iSignature = new FunctionSignature(1, PrimitiveType.INTEGER, PrimitiveType.INTEGER,
 					PrimitiveType.BOOLEAN);
 			FunctionSignature cSignature = new FunctionSignature(1, PrimitiveType.CHARACTER, PrimitiveType.CHARACTER,
@@ -104,9 +102,11 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 					PrimitiveType.BOOLEAN);
 			FunctionSignature bSignature = new FunctionSignature(1, PrimitiveType.BOOLEAN, PrimitiveType.BOOLEAN,
 					PrimitiveType.BOOLEAN);
+			FunctionSignature sSignature = new FunctionSignature(1, PrimitiveType.STRING, PrimitiveType.STRING,
+					PrimitiveType.BOOLEAN);
 
 			if (comparison == Punctuator.EQUAL || comparison == Punctuator.NOT_EQUAL) {
-				new FunctionSignatures(comparison, iSignature, cSignature, fSignature, bSignature);
+				new FunctionSignatures(comparison, iSignature, cSignature, fSignature, bSignature, sSignature);
 			} else {
 				new FunctionSignatures(comparison, iSignature, cSignature, fSignature);
 			}

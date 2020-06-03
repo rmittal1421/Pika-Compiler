@@ -21,6 +21,7 @@ import parseTree.nodeTypes.NewlineNode;
 import parseTree.nodeTypes.PrintStatementNode;
 import parseTree.nodeTypes.ProgramNode;
 import parseTree.nodeTypes.SpaceNode;
+import parseTree.nodeTypes.StringConstantNode;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -146,7 +147,7 @@ public class ASMCodeGenerator {
 		}
 
 		private void turnAddressIntoValue(ASMCodeFragment code, ParseNode node) {
-			if (node.getType() == PrimitiveType.INTEGER) {
+			if (node.getType() == PrimitiveType.INTEGER || node.getType() == PrimitiveType.STRING) {
 				code.add(LoadI);
 			} else if (node.getType() == PrimitiveType.FLOATING) {
 				code.add(LoadF);
@@ -215,13 +216,13 @@ public class ASMCodeGenerator {
 		}
 
 		private ASMOpcode opcodeForStore(Type type) {
-			if (type == PrimitiveType.INTEGER) {
+			if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING) {
 				return StoreI;
 			}
 			if (type == PrimitiveType.FLOATING) {
 				return StoreF;
 			}
-			if (type == PrimitiveType.BOOLEAN  || type == PrimitiveType.CHARACTER) {
+			if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
 				return StoreC;
 			}
 			assert false : "Type " + type + " unimplemented in opcodeForStore()";
@@ -233,7 +234,7 @@ public class ASMCodeGenerator {
 		public void visitLeave(BinaryOperatorNode node) {
 			Lextant operator = node.getOperator();
 
-			if (operator == Punctuator.GREATER) {
+			if (Punctuator.isComparisonPunctuator(operator.getLexeme())) {
 				visitComparisonOperatorNode(node, operator);
 			} else {
 				visitNormalBinaryOperatorNode(node);
@@ -262,24 +263,39 @@ public class ASMCodeGenerator {
 			code.add(Label, subLabel);
 
 			assert (node.child(0).getType() == node.child(1).getType());
+			assert (operator instanceof Punctuator);
 
-			// TODO: Change this check to a better check. For now, its ok.
-			if (node.child(0).getType() == PrimitiveType.FLOATING) {
-				code.add(FSubtract);
+			Punctuator punctuator = (Punctuator) operator;
+			PrimitiveType pt = (PrimitiveType) node.child(0).getType();
 
-				code.add(JumpFPos, trueLabel);
+			code.add(pt == PrimitiveType.FLOATING ? FSubtract : Subtract);
+			
+			// Change the type checker to something better
+			switch (punctuator) {
+			case GREATER:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFPos : JumpPos, trueLabel);
 				code.add(Jump, falseLabel);
-			} else {
-				code.add(Subtract);
-
-				code.add(JumpPos, trueLabel);
+				break;
+			case GREATER_OR_EQUAL:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFNeg : JumpNeg, falseLabel);
+				code.add(Jump, trueLabel);
+				break;
+			case LESS:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFNeg : JumpNeg, trueLabel);
 				code.add(Jump, falseLabel);
+				break;
+			case LESS_OR_EQUAL:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFPos : JumpPos, falseLabel);
+				code.add(Jump, trueLabel);
+				break;
+			case EQUAL:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFZero : JumpFalse, trueLabel);
+				code.add(Jump, falseLabel);
+				break;
+			case NOT_EQUAL:
+				code.add(pt == PrimitiveType.FLOATING ? JumpFZero : JumpFalse, falseLabel);
+				code.add(Jump, trueLabel);
 			}
-
-			code.add(Subtract);
-
-			code.add(JumpPos, trueLabel);
-			code.add(Jump, falseLabel);
 
 			code.add(Label, trueLabel);
 			code.add(PushI, 1);
@@ -307,8 +323,8 @@ public class ASMCodeGenerator {
 				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node);
 				code.append(fragment);
-				
-				if(fragment.isAddress()) { 
+
+				if (fragment.isAddress()) {
 					// Which means that the fragment returns a pointer
 					code.markAsAddress(); // Now we know that this code is a pointer
 				}
@@ -356,11 +372,21 @@ public class ASMCodeGenerator {
 
 			code.add(PushF, node.getValue());
 		}
-		
+
 		public void visit(CharacterConstantNode node) {
 			newValueCode(node);
-			
+
 			code.add(PushI, node.getValue());
+		}
+		public void visit(StringConstantNode node) {
+			newValueCode(node);
+			
+			Labeller labeller = new Labeller("string-constant");
+			String thisStringLabel = labeller.newLabel("");
+			
+			code.add(DLabel, thisStringLabel);
+			code.add(DataS, node.getValue());
+			code.add(PushD, thisStringLabel);
 		}
 	}
 

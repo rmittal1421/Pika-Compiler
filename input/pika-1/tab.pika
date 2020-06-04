@@ -1,0 +1,6 @@
+exec {
+	const a := 1.
+	const b := 2.
+	var c := 3.
+	print a, _n_, b, _t_, c, _n_.
+}

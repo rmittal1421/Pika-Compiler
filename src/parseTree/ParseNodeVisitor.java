@@ -27,6 +27,10 @@ public interface ParseNodeVisitor {
 	
 	void visitEnter(ProgramNode node);
 	void visitLeave(ProgramNode node);
+	
+	// non-leaf type node
+	void visitEnter(TypeNode node);
+	void visitLeave(TypeNode node);
 
 
 	// leaf nodes: visitLeaf only
@@ -39,6 +43,7 @@ public interface ParseNodeVisitor {
 	void visit(StringConstantNode node);
 	void visit(NewlineNode node);
 	void visit(SpaceNode node);
+	void visit(TabNode node);
 
 	
 	public static class Default implements ParseNodeVisitor
@@ -84,6 +89,12 @@ public interface ParseNodeVisitor {
 		public void visitLeave(ParseNode node) {
 			defaultVisitLeave(node);
 		}
+		public void visitEnter(TypeNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(TypeNode node) {
+			defaultVisitLeave(node);
+		}
 		public void visitEnter(PrintStatementNode node) {
 			defaultVisitEnter(node);
 		}
@@ -123,6 +134,9 @@ public interface ParseNodeVisitor {
 			defaultVisitForLeaf(node);
 		}	
 		public void visit(SpaceNode node) {
+			defaultVisitForLeaf(node);
+		}
+		public void visit(TabNode node) {
 			defaultVisitForLeaf(node);
 		}
 	}

@@ -1,0 +1,4 @@
+exec {
+	const int := 1.
+	print int.
+}

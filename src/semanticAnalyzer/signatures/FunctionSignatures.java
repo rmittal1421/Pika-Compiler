@@ -5,9 +5,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import asmCodeGenerator.FloatingDivideCodeGenerator;
-import asmCodeGenerator.IntegerDivideCodeGenerator;
 import asmCodeGenerator.codeStorage.ASMOpcode;
+import asmCodeGenerator.specialCodeGenerator.CharToBoolCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.FloatingDivideCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.IntToBoolCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.IntToCharCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.IntegerDivideCodeGenerator;
 import lexicalAnalyzer.Punctuator;
 import semanticAnalyzer.types.Type;
 import semanticAnalyzer.types.PrimitiveType;
@@ -92,6 +95,28 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 						PrimitiveType.INTEGER),
 				new FunctionSignature(new FloatingDivideCodeGenerator(), PrimitiveType.FLOATING, PrimitiveType.FLOATING,
 						PrimitiveType.FLOATING));
+		new FunctionSignatures(Punctuator.CAST,
+				// Casting to itself
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.BOOLEAN, PrimitiveType.BOOLEAN, PrimitiveType.BOOLEAN),
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.CHARACTER, PrimitiveType.CHARACTER, PrimitiveType.CHARACTER),
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.INTEGER, PrimitiveType.INTEGER, PrimitiveType.INTEGER),
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.FLOATING, PrimitiveType.FLOATING, PrimitiveType.FLOATING),
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING),
+				// Casting using existing Opcodes
+				new FunctionSignature(ASMOpcode.Nop, PrimitiveType.CHARACTER, PrimitiveType.INTEGER, 
+						PrimitiveType.INTEGER),
+				new FunctionSignature(ASMOpcode.ConvertF, PrimitiveType.INTEGER, PrimitiveType.FLOATING,
+						PrimitiveType.FLOATING),
+				new FunctionSignature(ASMOpcode.ConvertI, PrimitiveType.FLOATING, PrimitiveType.INTEGER,
+						PrimitiveType.INTEGER),
+				// Casting using specially generated fragmented code
+				new FunctionSignature(new IntToBoolCodeGenerator(), PrimitiveType.INTEGER, PrimitiveType.BOOLEAN, 
+						PrimitiveType.BOOLEAN),
+				new FunctionSignature(new CharToBoolCodeGenerator(), PrimitiveType.CHARACTER, PrimitiveType.BOOLEAN,
+						PrimitiveType.BOOLEAN),
+				new FunctionSignature(new IntToCharCodeGenerator(), PrimitiveType.INTEGER, PrimitiveType.CHARACTER, 
+						PrimitiveType.CHARACTER)
+				);
 
 		for (Punctuator comparison : Punctuator.ComparisonOperators) {
 			FunctionSignature iSignature = new FunctionSignature(1, PrimitiveType.INTEGER, PrimitiveType.INTEGER,

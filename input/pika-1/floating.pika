@@ -2,7 +2,7 @@ exec {
 	# Integer testing
 	
 	const a := 1.
-	const b := -2.
+	const b := 2.
 	const c := a + b.
 	const d := b * c.
 	const e := b > d.
@@ -17,5 +17,8 @@ exec {
 	const h := g + pi.
 	const i := pi * pi.
 	const j := pi > g.
-	print f; g; h; i; j, _n_. # Should print +1.101E12 -1.12 2.02519 9.8922201 true
+	print f; g; h; i; j, _n_. # Should print +1.101E12 -1.12 2.02519 9.8922201 true, _n_.
+	
+	const z := -.31.
+	print z.
 }

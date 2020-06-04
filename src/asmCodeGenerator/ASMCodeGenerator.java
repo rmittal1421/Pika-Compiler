@@ -6,6 +6,7 @@ import java.util.Map;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMOpcode;
 import asmCodeGenerator.runtime.RunTime;
+import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
 import parseTree.*;
@@ -23,6 +24,8 @@ import parseTree.nodeTypes.PrintStatementNode;
 import parseTree.nodeTypes.ProgramNode;
 import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
+import parseTree.nodeTypes.TabNode;
+import parseTree.nodeTypes.TypeNode;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -203,6 +206,12 @@ public class ASMCodeGenerator {
 			code.add(PushD, RunTime.SPACE_PRINT_FORMAT);
 			code.add(Printf);
 		}
+		
+		public void visit(TabNode node) {
+			newVoidCode(node);
+			code.add(PushD, RunTime.TAB_PRINT_FORMAT);
+			code.add(Printf);
+		}
 
 		public void visitLeave(DeclarationNode node) {
 			newVoidCode(node);
@@ -226,6 +235,10 @@ public class ASMCodeGenerator {
 			
 			Type type = node.getType();
 			code.add(opcodeForStore(type));
+		}
+		
+		public void visitLeave(TypeNode node) {
+			newVoidCode(node);
 		}
 
 		private ASMOpcode opcodeForStore(Type type) {
@@ -323,11 +336,13 @@ public class ASMCodeGenerator {
 		private void visitNormalBinaryOperatorNode(BinaryOperatorNode node) {
 			newValueCode(node);
 			ASMCodeFragment arg1 = removeValueCode(node.child(0));
-			ASMCodeFragment arg2 = removeValueCode(node.child(1));
-
 			code.append(arg1);
-			code.append(arg2);
-
+			
+			if(!(node.child(1) instanceof TypeNode)) {
+				ASMCodeFragment arg2 = removeValueCode(node.child(1));
+				code.append(arg2);
+			}
+			
 			Object variant = node.getSignature().getVariant();
 			if (variant instanceof ASMOpcode) {
 				ASMOpcode opcode = (ASMOpcode) variant;

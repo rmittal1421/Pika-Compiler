@@ -23,6 +23,8 @@ import parseTree.nodeTypes.PrintStatementNode;
 import parseTree.nodeTypes.ProgramNode;
 import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
+import parseTree.nodeTypes.TabNode;
+import parseTree.nodeTypes.TypeNode;
 import semanticAnalyzer.signatures.FunctionSignature;
 import semanticAnalyzer.signatures.FunctionSignatures;
 import semanticAnalyzer.types.PrimitiveType;
@@ -107,6 +109,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Type assignmentType = expression.getType();
 		node.setType(assignmentType);
 	}
+	
+	@Override
+	public void visitLeave(TypeNode node) {
+		node.setType(PrimitiveType.fromToken(node.typeToken()));
+	}
 
 	///////////////////////////////////////////////////////////////////////////
 	// expressions
@@ -173,6 +180,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 	@Override
 	public void visit(SpaceNode node) {
+	}
+	
+	@Override
+	public void visit(TabNode node) {
 	}
 
 	///////////////////////////////////////////////////////////////////////////

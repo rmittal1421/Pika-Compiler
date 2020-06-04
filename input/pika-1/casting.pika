@@ -1,0 +1,23 @@
+exec {
+	var a := -1.21E-5.
+	var b := [a | int].
+	print a; b; _n_.
+	
+	var c := -1.
+	var d := 0.
+	var e := [c | bool].
+	var f := [d | bool].
+	print e; f, _n_.
+	
+	var g := [^!^ | bool].
+	print g; _n_.
+	
+	var h := [200 | char].
+	print h; _n_.
+	
+	const j := "Raghav".
+	var i := [j | string].
+	print j; i; j == i; _n_.
+	
+	const r := 
+}

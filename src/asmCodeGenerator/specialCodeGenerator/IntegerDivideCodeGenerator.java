@@ -1,4 +1,4 @@
-package asmCodeGenerator;
+package asmCodeGenerator.specialCodeGenerator;
 
 import static asmCodeGenerator.codeStorage.ASMOpcode.Divide;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Duplicate;

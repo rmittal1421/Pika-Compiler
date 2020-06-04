@@ -77,45 +77,54 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		StringBuffer buffer = new StringBuffer();
 
 		LocatedChar next = input.peek();
-		if (firstChar.isNumericSign() && !next.isDigit() && !next.isDecimalPoint()) {
+
+		// Numeric sign followed by digit is allowed
+		// Numeric sign followed by decimal is allowed
+		// Decimal followed by digit is allowed
+		// In all other cases, go to PunctuatorScanner
+
+		if (firstChar.isNumericSign() && (!next.isDigit() && !next.isDecimalPoint())) {
+			return PunctuatorScanner.scan(firstChar, input);
+		} else if(firstChar.isDecimalPoint() && !next.isDigit()) {
 			return PunctuatorScanner.scan(firstChar, input);
 		}
 
 		buffer.append(firstChar.getCharacter());
 
-		if (firstChar.isDigit() || firstChar.isNumericSign()) {
+		if (firstChar.isDecimalPoint()) {
+			return appendFloatingPointAfterDecimal(firstChar, buffer);
+		} else {
 			appendSubsequentDigits(buffer);
-
 			next = input.next();
-			LocatedChar secondNext = input.peek();
-
-			// TODO: Handle the case where the floating number starts with .
-			if (next.isDecimalPoint() && secondNext.isDigit()) {
-				// It is a floating number
+			if (next.isDecimalPoint() && input.peek().isDigit()) {
 				buffer.append(next.getCharacter());
-				appendSubsequentDigits(buffer);
-
-				if (input.peek().getCharacter() == 'E') {
-					buffer.append(input.next().getCharacter());
-					if (input.peek().isNumericSign()) {
-						buffer.append(input.next().getCharacter());
-					}
-
-					if (input.peek().isDigit()) {
-						// The floating number with E is in correct format
-						appendSubsequentDigits(buffer);
-					} else {
-						// The floating number is not in correct format
-						// TODO: Throw a lexical error
-						lexicalError(input.next());
-					}
-				}
-				return FloatingToken.make(firstChar.getLocation(), buffer.toString());
+				return appendFloatingPointAfterDecimal(firstChar, buffer);
 			}
-			// Otherwise, if it has made it till here, it is an integer
 			input.pushback(next);
 		}
+
 		return IntegerToken.make(firstChar.getLocation(), buffer.toString());
+	}
+
+	private Token appendFloatingPointAfterDecimal(LocatedChar firstChar, StringBuffer buffer) {
+		appendSubsequentDigits(buffer);
+
+		if (input.peek().getCharacter() == 'E') {
+			buffer.append(input.next().getCharacter());
+			if (input.peek().isNumericSign()) {
+				buffer.append(input.next().getCharacter());
+			}
+
+			if (input.peek().isDigit()) {
+				// The floating number with E is in correct format
+				appendSubsequentDigits(buffer);
+			} else {
+				// The floating number is not in correct format
+				// TODO: Throw a lexical error
+				lexicalError(input.next());
+			}
+		}
+		return FloatingToken.make(firstChar.getLocation(), buffer.toString());
 	}
 
 	private void appendSubsequentDigits(StringBuffer buffer) {
@@ -158,12 +167,12 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 
 		LocatedChar c = input.next();
 		LocatedChar faultyChar = c;
-		
-		while(c.isValidIdentifierCharacter()) {
+
+		while (c.isValidIdentifierCharacter()) {
 			buffer.append(c.getCharacter());
 			identifierLength++;
-			
-			if(identifierLength == 33) {
+
+			if (identifierLength == 33) {
 				faultyChar = c;
 			}
 			c = input.next();
@@ -198,24 +207,24 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 			}
 		}
 	}
-	
+
 	private Token scanString(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
 		appendSubsequentStringCharacters(buffer);
-		
+
 		String lexeme = buffer.toString();
 		return StringToken.make(firstChar.getLocation(), lexeme);
 	}
-	
+
 	private void appendSubsequentStringCharacters(StringBuffer buffer) {
 		LocatedChar c = input.next();
-		
-		while(!c.isStringTerminator()) {
+
+		while (!c.isStringTerminator()) {
 			buffer.append(c.getCharacter());
 			c = input.next();
 		}
-		if(!c.isStringSymbol()) {
-			//String is ended by endline which should be an error
+		if (!c.isStringSymbol()) {
+			// String is ended by endline which should be an error
 			lexicalErrorString(c);
 		}
 	}
@@ -275,7 +284,7 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: identifier length exceeded than 32 at invalid character " + ch);
 	}
-	
+
 	private void lexicalErrorString(LocatedChar ch) {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: String token contains an unexpected character " + ch);

@@ -19,6 +19,8 @@ import parseTree.nodeTypes.PrintStatementNode;
 import parseTree.nodeTypes.ProgramNode;
 import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
+import parseTree.nodeTypes.TabNode;
+import parseTree.nodeTypes.TypeNode;
 import tokens.*;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
@@ -191,11 +193,15 @@ public class Parser {
 			readToken();
 			ParseNode child = new NewlineNode(previouslyRead);
 			parent.appendChild(child);
+		} else if(nowReading.isLextant(Keyword.TAB)) {
+			readToken();
+			ParseNode child = new TabNode(previouslyRead);
+			parent.appendChild(child);
 		}
 		// else we interpret the printExpression as epsilon, and do nothing
 	}
 	private boolean startsPrintExpression(Token token) {
-		return startsExpression(token) || token.isLextant(Keyword.NEWLINE) ;
+		return startsExpression(token) || token.isLextant(Keyword.NEWLINE) || token.isLextant(Keyword.TAB) ;
 	}
 	
 	
@@ -255,7 +261,7 @@ public class Parser {
 	// additiveExpression       -> multiplicativeExpression [+ multiplicativeExpression]*  (left-assoc)
 	// multiplicativeExpression -> atomicExpression [MULT atomicExpression]*  (left-assoc)
 	// atomicExpression         -> literal
-	// literal                  -> intNumber | identifier | booleanConstant
+	// literal                  -> intNumber | floatingNumber | identifier | booleanConstant | character | string
 
 	// expr  -> comparisonExpression
 	private ParseNode parseExpression() {		
@@ -335,10 +341,40 @@ public class Parser {
 		if(!startsAtomicExpression(nowReading)) {
 			return syntaxErrorNode("atomic expression");
 		}
+		if(startsParanthesisedExpression(nowReading)) {
+			readToken();
+			ParseNode expression = parseExpression();
+			expect(Punctuator.CLOSE_PARENTHESES);
+			return expression;
+		}
+		if(startsCastingExpression(nowReading)) {
+			readToken();
+			ParseNode expression = parseExpression();
+			expect(Punctuator.CAST);
+			Token pipeOperator = previouslyRead;
+			ParseNode type = parseType();
+			expect(Punctuator.CLOSE_SQUARE_BRACKET);
+			return BinaryOperatorNode.withChildren(pipeOperator, expression, type);
+		}
 		return parseLiteral();
 	}
 	private boolean startsAtomicExpression(Token token) {
-		return startsLiteral(token);
+		return startsLiteral(token) ||
+				startsParanthesisedExpression(token) ||
+				startsCastingExpression(token);
+	}
+	
+	// Type parsing
+	private ParseNode parseType() {
+		readToken();
+		if(!isATypeToken(previouslyRead)) {
+			// TODO: Change the error shown when the type is not the ones which are defined
+			return syntaxErrorNode("type");
+		}
+		return new TypeNode(previouslyRead);
+	}
+	private boolean isATypeToken(Token token) {
+		return token.isLextant(Keyword.BOOL, Keyword.CHAR, Keyword.STRING, Keyword.INT, Keyword.FLOAT);
 	}
 	
 	// literal -> integer | float | identifier | booleanConstant | string
@@ -346,7 +382,6 @@ public class Parser {
 		if(!startsLiteral(nowReading)) {
 			return syntaxErrorNode("literal");
 		}
-		
 		if(startsIntNumber(nowReading)) {
 			return parseIntNumber();
 		}
@@ -369,7 +404,12 @@ public class Parser {
 		return syntaxErrorNode("literal");
 	}
 	private boolean startsLiteral(Token token) {
-		return startsIntNumber(token) || startsFloatNumber(token) || startsCharacter(token) || startsString(token) || startsIdentifier(token) || startsBooleanConstant(token);
+		return startsIntNumber(token) || 
+				startsFloatNumber(token) || 
+				startsCharacter(token) || 
+				startsString(token) || 
+				startsIdentifier(token) || 
+				startsBooleanConstant(token);
 	}
 
 	// integer (terminal)
@@ -442,6 +482,16 @@ public class Parser {
 	}
 	private boolean startsBooleanConstant(Token token) {
 		return token.isLextant(Keyword.TRUE, Keyword.FALSE);
+	}
+	
+	// Expression in parantheses
+	private boolean startsParanthesisedExpression(Token token) {
+		return token.isLextant(Punctuator.OPEN_PARANTHESES);
+	}
+	
+	// Casting expressions
+	private boolean startsCastingExpression(Token token) {
+		return token.isLextant(Punctuator.OPEN_SQUARE_BRACKET);
 	}
 
 	private void readToken() {

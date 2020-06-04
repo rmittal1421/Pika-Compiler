@@ -73,8 +73,12 @@ public class LocatedChar {
 		return character == '+' || character == '-';
 	}
 
+	public boolean isPotentialNumStartAndNotDigit() {
+		return isNumericSign() || character == '.';
+	}
+	
 	public boolean isNumberStart() {
-		return Character.isDigit(character) || isNumericSign();
+		return Character.isDigit(character) || isPotentialNumStartAndNotDigit();
 	}
 
 	public boolean isDecimalPoint() {

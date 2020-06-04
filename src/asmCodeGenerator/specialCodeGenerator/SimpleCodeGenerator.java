@@ -1,4 +1,4 @@
-package asmCodeGenerator;
+package asmCodeGenerator.specialCodeGenerator;
 
 import parseTree.ParseNode;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;

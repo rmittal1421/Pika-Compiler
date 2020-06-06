@@ -36,6 +36,7 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 	protected Token findNextToken() {
 		LocatedChar ch = nextNonWhitespaceChar();
 
+		// Remove comments while scanning instead of doing it while parsing
 		while (ch.isCommentToken()) {
 			ch = input.next();
 			while (!(ch.isCommentToken() || ch.isNewLine())) {
@@ -75,13 +76,9 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 
 	private Token scanNumber(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
+		boolean digitsScanned = false;
 
 		LocatedChar next = input.peek();
-
-		// Numeric sign followed by digit is allowed
-		// Numeric sign followed by decimal is allowed
-		// Decimal followed by digit is allowed
-		// In all other cases, go to PunctuatorScanner
 
 		if (firstChar.isNumericSign() && (!next.isDigit() && !next.isDecimalPoint())) {
 			return PunctuatorScanner.scan(firstChar, input);
@@ -90,15 +87,27 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		}
 
 		buffer.append(firstChar.getCharacter());
+		if(firstChar.isDigit()) {
+			digitsScanned = true;
+		}
 
 		if (firstChar.isDecimalPoint()) {
 			return appendFloatingPointAfterDecimal(firstChar, buffer);
 		} else {
+			int bufferLength = buffer.length();
 			appendSubsequentDigits(buffer);
+			if(bufferLength < buffer.length()) {
+				// Digits have been added
+				digitsScanned = true;
+			}
 			next = input.next();
 			if (next.isDecimalPoint() && input.peek().isDigit()) {
 				buffer.append(next.getCharacter());
 				return appendFloatingPointAfterDecimal(firstChar, buffer);
+			} else if(next.isDecimalPoint() && !input.peek().isDigit() && !digitsScanned) {
+				next = input.next();
+				lexicalErrorFloating(next);
+				return findNextToken();
 			}
 			input.pushback(next);
 		}
@@ -108,22 +117,27 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 
 	private Token appendFloatingPointAfterDecimal(LocatedChar firstChar, StringBuffer buffer) {
 		appendSubsequentDigits(buffer);
-
-		if (input.peek().getCharacter() == 'E') {
-			buffer.append(input.next().getCharacter());
-			if (input.peek().isNumericSign()) {
-				buffer.append(input.next().getCharacter());
+		LocatedChar next = input.peek();
+		
+		if (next.getCharacter() == 'E') {
+			next = input.next();
+			buffer.append(next.getCharacter());
+			next = input.peek();
+			if (next.isNumericSign()) {
+				next = input.next();
+				buffer.append(next.getCharacter());
 			}
 
-			if (input.peek().isDigit()) {
-				// The floating number with E is in correct format
+			next = input.peek();
+			if (next.isDigit()) {
 				appendSubsequentDigits(buffer);
 			} else {
-				// The floating number is not in correct format
-				// TODO: Throw a lexical error
-				lexicalError(input.next());
+				next = input.next();
+				lexicalErrorFloating(next);
+				return findNextToken();
 			}
 		}
+		
 		return FloatingToken.make(firstChar.getLocation(), buffer.toString());
 	}
 
@@ -142,7 +156,6 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 	private Token scanIdentifier(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append(firstChar.getCharacter());
-//		appendSubsequentLowercase(buffer);
 		appendSubsequentIdentifierCharacters(buffer);
 
 		String lexeme = buffer.toString();
@@ -153,15 +166,6 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		}
 	}
 
-//	TODO: Remove this code
-//	private void appendSubsequentLowercase(StringBuffer buffer) {
-//		LocatedChar c = input.next();
-//		while (c.isLowerCase()) {
-//			buffer.append(c.getCharacter());
-//			c = input.next();
-//		}
-//		input.pushback(c);
-//	}
 	private void appendSubsequentIdentifierCharacters(StringBuffer buffer) {
 		int identifierLength = buffer.length();
 
@@ -187,13 +191,17 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 	private Token scanCharacter(LocatedChar firstChar) {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append(firstChar.getCharacter());
-		appendSubsequentCharacterToken(buffer);
-
-		String lexeme = buffer.toString();
-		return CharacterToken.make(firstChar.getLocation(), lexeme);
+		boolean characterScannedProperly = appendSubsequentCharacterToken(buffer);
+		
+		if(characterScannedProperly) {
+			String lexeme = buffer.toString();
+			return CharacterToken.make(firstChar.getLocation(), lexeme);
+		} else {
+			return findNextToken();
+		}
 	}
 
-	private void appendSubsequentCharacterToken(StringBuffer buffer) {
+	private boolean appendSubsequentCharacterToken(StringBuffer buffer) {
 		LocatedChar c = input.next();
 		if (c.isCharacter()) {
 			buffer.append(c.getCharacter());
@@ -201,11 +209,12 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 
 			if (c.isCharacterSymbol()) {
 				buffer.append(input.next().getCharacter());
-			} else {
-				// TODO: Throw error in the correct manner if this is not correct
-				throw new IllegalArgumentException("bad LocatedChar " + c + "in character initialization");
-			}
+				return true;
+			} 
 		}
+		
+		lexicalErrorCharacter(c);
+		return false;
 	}
 
 	private Token scanString(LocatedChar firstChar) {
@@ -284,10 +293,20 @@ public class LexicalAnalyzer extends ScannerImp implements Scanner {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: identifier length exceeded than 32 at invalid character " + ch);
 	}
+	
+	private void lexicalErrorCharacter(LocatedChar ch) {
+		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
+		log.severe("Lexical error: Initialization of character token contains unexpected character " + ch);
+	}
 
 	private void lexicalErrorString(LocatedChar ch) {
 		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
 		log.severe("Lexical error: String token contains an unexpected character " + ch);
+	}
+	
+	private void lexicalErrorFloating(LocatedChar ch) {
+		PikaLogger log = PikaLogger.getLogger("compiler.lexicalAnalyzer");
+		log.severe("Lexical error: Floating number contains an unexpected characters at " + ch);
 	}
 
 }

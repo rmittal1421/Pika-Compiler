@@ -7,4 +7,7 @@ exec {
 	const s2 := "str".
 	const s3 := s1.
 	print s1 != s2; s1 == s3, _n_.
+	
+	const r := "raghav\n".
+	print r.
 }

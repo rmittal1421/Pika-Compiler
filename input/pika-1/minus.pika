@@ -2,7 +2,7 @@ exec {
 
 	const a := 2.2.
 	const b := 0.0.
-	const c := a - b.
+	const c := a % b.
 	const d := c.
 	print d, _n_.
 }

@@ -182,7 +182,7 @@ public class Parser {
 	
 
 	// This adds the printExpression it parses to the children of the given parent
-	// printExpression -> (expr | nl)?     (nullable)
+	// printExpression -> (expr | nl | tab)?     (nullable)
 	
 	private void parsePrintExpression(PrintStatementNode parent) {
 		if(startsExpression(nowReading)) {
@@ -281,13 +281,13 @@ public class Parser {
 		}
 		
 		ParseNode left = parseAdditiveExpression();
-//		if(nowReading.isLextant(Punctuator.GREATER)) {
-		if(Punctuator.isComparisonPunctuator(nowReading.getLexeme())) {
+
+		while(Punctuator.isComparisonPunctuator(nowReading.getLexeme())) {
 			Token compareToken = nowReading;
 			readToken();
 			ParseNode right = parseAdditiveExpression();
 			
-			return BinaryOperatorNode.withChildren(compareToken, left, right);
+			left = BinaryOperatorNode.withChildren(compareToken, left, right);
 		}
 		return left;
 
@@ -341,34 +341,55 @@ public class Parser {
 		if(!startsAtomicExpression(nowReading)) {
 			return syntaxErrorNode("atomic expression");
 		}
-		if(startsParanthesisedExpression(nowReading)) {
-			readToken();
-			ParseNode expression = parseExpression();
-			expect(Punctuator.CLOSE_PARENTHESES);
-			return expression;
+		if(startsParenthesizedExpression(nowReading)) {
+			return parseParenthesizedExpression();
 		}
 		if(startsCastingExpression(nowReading)) {
-			readToken();
-			ParseNode expression = parseExpression();
-			expect(Punctuator.CAST);
-			Token pipeOperator = previouslyRead;
-			ParseNode type = parseType();
-			expect(Punctuator.CLOSE_SQUARE_BRACKET);
-			return BinaryOperatorNode.withChildren(pipeOperator, expression, type);
+			return parseCastingExpression();
 		}
 		return parseLiteral();
 	}
 	private boolean startsAtomicExpression(Token token) {
 		return startsLiteral(token) ||
-				startsParanthesisedExpression(token) ||
+				startsParenthesizedExpression(token) ||
 				startsCastingExpression(token);
+	}
+	
+	// Parenthesized Expression parsing
+	private ParseNode parseParenthesizedExpression() {
+		if(!startsParenthesizedExpression(nowReading)) {
+			return syntaxErrorNode("paranthesis expression");
+		}
+		readToken();
+		ParseNode expression = parseExpression();
+		expect(Punctuator.CLOSE_PARENTHESES);
+		return expression;
+	}
+	private boolean startsParenthesizedExpression(Token token) {
+		return token.isLextant(Punctuator.OPEN_PARANTHESES);
+	}
+	
+	// Casting E parsing
+	private ParseNode parseCastingExpression() {
+		if(!startsCastingExpression(nowReading)) {
+			return syntaxErrorNode("casting expression");
+		}
+		readToken();
+		ParseNode expression = parseExpression();
+		expect(Punctuator.CAST);
+		Token castOperator = previouslyRead;
+		ParseNode type = parseType();
+		expect(Punctuator.CLOSE_SQUARE_BRACKET);
+		return BinaryOperatorNode.withChildren(castOperator, expression, type);
+	}
+	private boolean startsCastingExpression(Token token) {
+		return token.isLextant(Punctuator.OPEN_SQUARE_BRACKET);
 	}
 	
 	// Type parsing
 	private ParseNode parseType() {
 		readToken();
 		if(!isATypeToken(previouslyRead)) {
-			// TODO: Change the error shown when the type is not the ones which are defined
 			return syntaxErrorNode("type");
 		}
 		return new TypeNode(previouslyRead);
@@ -482,16 +503,6 @@ public class Parser {
 	}
 	private boolean startsBooleanConstant(Token token) {
 		return token.isLextant(Keyword.TRUE, Keyword.FALSE);
-	}
-	
-	// Expression in parantheses
-	private boolean startsParanthesisedExpression(Token token) {
-		return token.isLextant(Punctuator.OPEN_PARANTHESES);
-	}
-	
-	// Casting expressions
-	private boolean startsCastingExpression(Token token) {
-		return token.isLextant(Punctuator.OPEN_SQUARE_BRACKET);
 	}
 
 	private void readToken() {

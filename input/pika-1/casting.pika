@@ -19,5 +19,7 @@ exec {
 	var i := [j | string].
 	print j; i; j == i; _n_.
 	
-	const r := 
+	var r := 1.
+	var s := [r | float].
+	print s < 0.0; _n_.
 }

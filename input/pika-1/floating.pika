@@ -19,6 +19,12 @@ exec {
 	const j := pi > g.
 	print f; g; h; i; j, _n_. # Should print +1.101E12 -1.12 2.02519 9.8922201 true, _n_.
 	
-	const z := -.31.
-	print z.
+	const z := .31.
+	print z; _n_.
+	
+	const ab := 1.1+ 1.41.
+	print ab; _n_.
+	
+	var abc := .1E+1.
+	print abc.
 }

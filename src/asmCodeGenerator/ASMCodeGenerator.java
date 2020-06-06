@@ -292,35 +292,38 @@ public class ASMCodeGenerator {
 			assert (operator instanceof Punctuator);
 
 			Punctuator punctuator = (Punctuator) operator;
-			PrimitiveType pt = (PrimitiveType) node.child(0).getType();
+			boolean isFloating = node.child(0).getType() == PrimitiveType.FLOATING;
 
-			code.add(pt == PrimitiveType.FLOATING ? FSubtract : Subtract);
+			code.add(isFloating ? FSubtract : Subtract);
 			
 			// Change the type checker to something better
 			switch (punctuator) {
 			case GREATER:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFPos : JumpPos, trueLabel);
+				code.add(isFloating ? JumpFPos : JumpPos, trueLabel);
 				code.add(Jump, falseLabel);
 				break;
 			case GREATER_OR_EQUAL:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFNeg : JumpNeg, falseLabel);
+				code.add(isFloating ? JumpFNeg : JumpNeg, falseLabel);
 				code.add(Jump, trueLabel);
 				break;
 			case LESS:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFNeg : JumpNeg, trueLabel);
+				code.add(isFloating ? JumpFNeg : JumpNeg, trueLabel);
 				code.add(Jump, falseLabel);
 				break;
 			case LESS_OR_EQUAL:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFPos : JumpPos, falseLabel);
+				code.add(isFloating ? JumpFPos : JumpPos, falseLabel);
 				code.add(Jump, trueLabel);
 				break;
 			case EQUAL:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFZero : JumpFalse, trueLabel);
+				code.add(isFloating ? JumpFZero : JumpFalse, trueLabel);
 				code.add(Jump, falseLabel);
 				break;
 			case NOT_EQUAL:
-				code.add(pt == PrimitiveType.FLOATING ? JumpFZero : JumpFalse, falseLabel);
+				code.add(isFloating ? JumpFZero : JumpFalse, falseLabel);
 				code.add(Jump, trueLabel);
+				break;
+			default:
+				// do nothing
 			}
 
 			code.add(Label, trueLabel);
@@ -330,7 +333,6 @@ public class ASMCodeGenerator {
 			code.add(PushI, 0);
 			code.add(Jump, joinLabel);
 			code.add(Label, joinLabel);
-
 		}
 
 		private void visitNormalBinaryOperatorNode(BinaryOperatorNode node) {
@@ -357,7 +359,7 @@ public class ASMCodeGenerator {
 					code.markAsAddress(); // Now we know that this code is a pointer
 				}
 			} else {
-				// TODO: throw exception
+				throw new UnsupportedOperationException("No ASMOpcode or fragment code matches the provided variant");
 			}
 		}
 

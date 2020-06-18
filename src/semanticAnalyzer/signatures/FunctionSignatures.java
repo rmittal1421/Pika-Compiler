@@ -1,18 +1,24 @@
 package semanticAnalyzer.signatures;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import asmCodeGenerator.codeStorage.ASMOpcode;
+import asmCodeGenerator.specialCodeGenerator.ArrayIndexingCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CharToBoolCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.FloatingDivideCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.IntToBoolCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.IntToCharCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.IntegerDivideCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.ShortCircuitAndCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.ShortCircuitOrCodeGenerator;
 import lexicalAnalyzer.Punctuator;
 import semanticAnalyzer.types.Type;
+import semanticAnalyzer.types.TypeVariable;
+import semanticAnalyzer.types.Array;
 import semanticAnalyzer.types.PrimitiveType;
 
 public class FunctionSignatures extends ArrayList<FunctionSignature> {
@@ -117,6 +123,23 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 				new FunctionSignature(new IntToCharCodeGenerator(), PrimitiveType.INTEGER, PrimitiveType.CHARACTER, 
 						PrimitiveType.CHARACTER)
 				);
+		new FunctionSignatures(Punctuator.OR,
+				new FunctionSignature(new ShortCircuitOrCodeGenerator(), PrimitiveType.BOOLEAN, PrimitiveType.BOOLEAN,
+						PrimitiveType.BOOLEAN)
+				);
+		new FunctionSignatures(Punctuator.AND,
+				new FunctionSignature(new ShortCircuitAndCodeGenerator(), PrimitiveType.BOOLEAN, PrimitiveType.BOOLEAN,
+						PrimitiveType.BOOLEAN)
+				);
+		
+		TypeVariable S = new TypeVariable("S");
+		List<TypeVariable> setS = Arrays.asList(S);
+		new FunctionSignatures(Punctuator.ARRAY_INDEXING, 
+				new FunctionSignature(
+					new ArrayIndexingCodeGenerator(),
+					setS,
+					new Array(S), PrimitiveType.INTEGER, S
+				));
 
 		for (Punctuator comparison : Punctuator.ComparisonOperators) {
 			FunctionSignature iSignature = new FunctionSignature(1, PrimitiveType.INTEGER, PrimitiveType.INTEGER,

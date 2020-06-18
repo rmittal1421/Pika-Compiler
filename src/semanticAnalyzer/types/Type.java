@@ -14,4 +14,10 @@ public interface Type {
 	 * @return string representation of type.
 	 */
 	public String infoString();
+	
+	public String pikaNativeString();
+	
+	public boolean equivalent(Type type);
+	
+	public Type getConcreteType();
 }

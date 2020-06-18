@@ -1,11 +1,13 @@
 package asmCodeGenerator.runtime;
 import static asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType.*;
 import static asmCodeGenerator.codeStorage.ASMOpcode.*;
+
+import asmCodeGenerator.Macros;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 public class RunTime {
 	public static final String EAT_LOCATION_ZERO      = "$eat-location-zero";		// helps us distinguish null pointers from real ones.
 	public static final String INTEGER_PRINT_FORMAT   = "$print-format-integer";
-	public static final String FLOATING_PRINT_FORMAT   = "$print-format-floating";
+	public static final String FLOATING_PRINT_FORMAT  = "$print-format-floating";
 	public static final String BOOLEAN_PRINT_FORMAT   = "$print-format-boolean";
 	public static final String CHARACTER_PRINT_FORMAT = "$print-format-character";
 	public static final String STRING_PRINT_FORMAT    = "$print-format-string";
@@ -17,16 +19,21 @@ public class RunTime {
 	public static final String GLOBAL_MEMORY_BLOCK    = "$global-memory-block";
 	public static final String USABLE_MEMORY_START    = "$usable-memory-start";
 	public static final String MAIN_PROGRAM_LABEL     = "$$main";
+	public static final String ARRAY_INDEXING_ARRAY   = "$a-indexing-array";
+	public static final String ARRAY_INDEXING_INDEX   = "$a-indexing-index";
 	
 	public static final String GENERAL_RUNTIME_ERROR = "$$general-runtime-error";
 	public static final String INTEGER_DIVIDE_BY_ZERO_RUNTIME_ERROR = "$$i-divide-by-zero";
-	public static final String FLOATING_DIVIDE_BY_ZERO_RUNTIME_ERROR = "$$-divide-by-zero";
+	public static final String FLOATING_DIVIDE_BY_ZERO_RUNTIME_ERROR = "$$f-divide-by-zero";
+	public static final String NULL_ARRAY_RUNTIME_ERROR = "$$array-null-error";
+	public static final String INDEX_OUT_OF_BOUNDS_RUNTIME_ERROR = "$$array-index-out-of-bound-error";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
 		result.append(jumpToMain());
 		result.append(stringsForPrintf());
 		result.append(runtimeErrors());
+		result.append(temporaryVariables());
 		result.add(DLabel, USABLE_MEMORY_START);
 		return result;
 	}
@@ -72,6 +79,8 @@ public class RunTime {
 		generalRuntimeError(frag);
 		integerDivideByZeroError(frag);
 		floatingDivideByZeroError(frag);
+		nullArrayIndexingError(frag);
+		arrayIndexOutOfBoundsError(frag);
 		
 		return frag;
 	}
@@ -85,6 +94,12 @@ public class RunTime {
 		frag.add(PushD, generalErrorMessage);
 		frag.add(Printf);
 		frag.add(Halt);
+		return frag;
+	}
+	private ASMCodeFragment temporaryVariables() {
+		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+		Macros.declareI(frag, ARRAY_INDEXING_ARRAY);
+		Macros.declareI(frag, ARRAY_INDEXING_INDEX);
 		return frag;
 	}
 	private void integerDivideByZeroError(ASMCodeFragment frag) {
@@ -105,6 +120,26 @@ public class RunTime {
 		
 		frag.add(Label, FLOATING_DIVIDE_BY_ZERO_RUNTIME_ERROR);
 		frag.add(PushD, floatingDivideByZeroMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	private void nullArrayIndexingError(ASMCodeFragment frag) {
+		String nullArrayIndexingMessage = "$errors-array-null-indexed";
+		
+		frag.add(DLabel, nullArrayIndexingMessage);
+		frag.add(DataS, "Null array indexed");
+		
+		frag.add(Label, NULL_ARRAY_RUNTIME_ERROR);
+		frag.add(PushD, nullArrayIndexingMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	private void arrayIndexOutOfBoundsError(ASMCodeFragment frag) {
+		String arrayIndexOutOfBoundsMessage = "$errors-array-index-out-of-bounds";
+		
+		frag.add(DLabel, arrayIndexOutOfBoundsMessage);
+		frag.add(DataS, "Array index out of bounds");
+		
+		frag.add(Label, INDEX_OUT_OF_BOUNDS_RUNTIME_ERROR);
+		frag.add(PushD, arrayIndexOutOfBoundsMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 	

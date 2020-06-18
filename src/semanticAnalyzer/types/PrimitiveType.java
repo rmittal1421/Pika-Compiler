@@ -25,11 +25,25 @@ public enum PrimitiveType implements Type {
 		this.sizeInBytes = size;
 		this.infoString = infoString;
 	}
+	@Override
 	public int getSize() {
 		return sizeInBytes;
 	}
+	@Override
 	public String infoString() {
 		return infoString;
+	}
+	@Override
+	public String pikaNativeString() {
+		return toString();
+	}
+	@Override 
+	public boolean equivalent(Type type) {
+		return this == type;
+	}
+	@Override
+	public Type getConcreteType() {
+		return this;
 	}
 	public Keyword getType() {
 		return this.type;

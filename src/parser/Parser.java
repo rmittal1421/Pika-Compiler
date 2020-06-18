@@ -98,7 +98,7 @@ public class Parser {
 	///////////////////////////////////////////////////////////
 	// statements
 	
-	// statement-> declaration | printStmt | assignmentStatement | blockStatement
+	// statement-> declaration | printStmt | assignmentStatement | blockStatement | ifStatement | whileStatement | deallocStatement
 	private ParseNode parseStatement() {
 		if(!startsStatement(nowReading)) {
 			return syntaxErrorNode("statement");
@@ -268,12 +268,54 @@ public class Parser {
 		if(!startsExpression(nowReading)) {
 			return syntaxErrorNode("expression");
 		}
-		return parseComparisonExpression();
+		return parseShortCircuitOrExpression();
 	}
 	private boolean startsExpression(Token token) {
+		return startsShortCircuitOrExpression(token);
+	}
+	
+	private ParseNode parseShortCircuitOrExpression() {
+		if(!startsShortCircuitOrExpression(nowReading)) {
+			return syntaxErrorNode("or(||) expression");
+		}
+		
+		ParseNode left = parseShortCircuitAndExpression();
+		
+		while(nowReading.isLextant(Punctuator.OR)) {
+			Token orToken = nowReading;
+			readToken();
+			ParseNode right = parseShortCircuitAndExpression();
+			
+			left = BinaryOperatorNode.withChildren(orToken, left, right);
+		}
+		return left;
+	}
+	private boolean startsShortCircuitOrExpression(Token token) {
+		return startsShortCircuitAndExpression(token);
+	}
+	
+	private ParseNode parseShortCircuitAndExpression() {
+		if(!startsShortCircuitAndExpression(nowReading)) {
+			return syntaxErrorNode("and(&&) expression");
+		}
+		
+		ParseNode left = parseComparisonExpression();
+		
+		while(nowReading.isLextant(Punctuator.AND)) {
+			Token andToken = nowReading;
+			readToken();
+			ParseNode right = parseComparisonExpression();
+			
+			left = BinaryOperatorNode.withChildren(andToken, left, right);
+		}
+		
+		return left;
+	}
+	private boolean startsShortCircuitAndExpression(Token token) {
 		return startsComparisonExpression(token);
 	}
-
+	
+	
 	// comparisonExpression -> additiveExpression [> additiveExpression]?
 	private ParseNode parseComparisonExpression() {
 		if(!startsComparisonExpression(nowReading)) {

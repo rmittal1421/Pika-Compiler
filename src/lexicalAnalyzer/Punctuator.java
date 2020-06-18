@@ -30,7 +30,13 @@ public enum Punctuator implements Lextant {
 	CLOSE_PARENTHESES(")"),
 	OPEN_SQUARE_BRACKET("["),
 	CLOSE_SQUARE_BRACKET("]"), 
-	CAST("|");
+	CAST("|"), 
+	ARRAY_INDEXING(""),
+	
+	// boolean operators
+	AND("&&"),
+	OR("||"),
+	NOT("!");
 	
 
 	private String lexeme;

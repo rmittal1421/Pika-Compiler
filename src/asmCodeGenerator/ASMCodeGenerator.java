@@ -6,6 +6,7 @@ import java.util.Map;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMOpcode;
 import asmCodeGenerator.runtime.RunTime;
+import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
@@ -238,7 +239,7 @@ public class ASMCodeGenerator {
 		}
 		
 		public void visitLeave(TypeNode node) {
-			newVoidCode(node);
+			newValueCode(node);
 		}
 
 		private ASMOpcode opcodeForStore(Type type) {
@@ -338,18 +339,19 @@ public class ASMCodeGenerator {
 		private void visitNormalBinaryOperatorNode(BinaryOperatorNode node) {
 			newValueCode(node);
 			ASMCodeFragment arg1 = removeValueCode(node.child(0));
-			code.append(arg1);
-			
-			if(!(node.child(1) instanceof TypeNode)) {
-				ASMCodeFragment arg2 = removeValueCode(node.child(1));
-				code.append(arg2);
-			}
+			ASMCodeFragment arg2 = removeValueCode(node.child(1));
 			
 			Object variant = node.getSignature().getVariant();
 			if (variant instanceof ASMOpcode) {
+				code.append(arg1);
+				code.append(arg2);
+				
 				ASMOpcode opcode = (ASMOpcode) variant;
 				code.add(opcode);
 			} else if (variant instanceof SimpleCodeGenerator) {
+				code.append(arg1);
+				code.append(arg2);
+				
 				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node);
 				code.append(fragment);
@@ -358,11 +360,21 @@ public class ASMCodeGenerator {
 					// Which means that the fragment returns a pointer
 					code.markAsAddress(); // Now we know that this code is a pointer
 				}
+			} else if (variant instanceof FullCodeGenerator) {
+				FullCodeGenerator generator = (FullCodeGenerator) variant;
+				ASMCodeFragment fragment = generator.generate(node, arg1, arg2);
+				
+				code.append(fragment);
+				
+				if(fragment.isAddress()) {
+					code.markAsAddress();
+				}
 			} else {
 				throw new UnsupportedOperationException("No ASMOpcode or fragment code matches the provided variant");
 			}
 		}
 
+		@SuppressWarnings("unused")
 		private ASMOpcode opcodeForOperator(Lextant lextant) {
 			assert (lextant instanceof Punctuator);
 			Punctuator punctuator = (Punctuator) lextant;

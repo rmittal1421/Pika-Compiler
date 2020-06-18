@@ -1,9 +1,11 @@
 package semanticAnalyzer.signatures;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
+import semanticAnalyzer.types.TypeVariable;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
 
@@ -13,15 +15,20 @@ public class FunctionSignature {
 	private Type resultType;
 	private Type[] paramTypes;
 	Object whichVariant;
+	private List<TypeVariable> typeVariables;
 	
 	
 	///////////////////////////////////////////////////////////////
 	// construction
 	
 	public FunctionSignature(Object whichVariant, Type ...types) {
+		this(whichVariant, new ArrayList<TypeVariable>(), types);
+	}
+	public FunctionSignature(Object whichVariant, List<TypeVariable> typeVariables, Type ...types) {
 		assert(types.length >= 1);
+		this.typeVariables = typeVariables;
 		storeParamTypes(types);
-		resultType = types[types.length-1];
+		resultType = types[types.length - 1];
 		this.whichVariant = whichVariant;
 	}
 	private void storeParamTypes(Type[] types) {
@@ -39,7 +46,7 @@ public class FunctionSignature {
 		return whichVariant;
 	}
 	public Type resultType() {
-		return resultType;
+		return resultType.getConcreteType();
 	}
 	public boolean isNull() {
 		return false;
@@ -50,6 +57,8 @@ public class FunctionSignature {
 	// main query
 
 	public boolean accepts(List<Type> types) {
+		resetTypeVariables();
+		
 		if(types.size() != paramTypes.length) {
 			return false;
 		}
@@ -65,9 +74,14 @@ public class FunctionSignature {
 		if(valueType == PrimitiveType.ERROR && ALL_TYPES_ACCEPT_ERROR_TYPES) {
 			return true;
 		}	
-		return variableType.equals(valueType);
+		return variableType.equivalent(valueType);
 	}
-	
+	private void resetTypeVariables() {
+		for(TypeVariable T: typeVariables) {
+			T.reset();
+		}
+	}
+ 	
 	// Null object pattern
 	private static FunctionSignature neverMatchedSignature = new FunctionSignature(1, PrimitiveType.ERROR) {
 		public boolean accepts(List<Type> types) {

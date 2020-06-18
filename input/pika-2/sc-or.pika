@@ -1,0 +1,10 @@
+exec {
+	const a := _false_.
+	const b := _false_.
+	const d := _true_.
+	const c := a || b || d.
+	
+	
+	const e :=  _true_ && c || _false_.
+	print e.
+}

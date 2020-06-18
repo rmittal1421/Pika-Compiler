@@ -16,6 +16,7 @@ import parseTree.nodeTypes.BlockStatementNode;
 import parseTree.nodeTypes.DeclarationNode;
 import parseTree.nodeTypes.ErrorNode;
 import parseTree.nodeTypes.IdentifierNode;
+import parseTree.nodeTypes.IfStatementNode;
 import parseTree.nodeTypes.IntegerConstantNode;
 import parseTree.nodeTypes.FloatingConstantNode;
 import parseTree.nodeTypes.NewlineNode;
@@ -25,6 +26,7 @@ import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
 import parseTree.nodeTypes.TabNode;
 import parseTree.nodeTypes.TypeNode;
+import parseTree.nodeTypes.WhileStatementNode;
 import semanticAnalyzer.signatures.FunctionSignature;
 import semanticAnalyzer.signatures.FunctionSignatures;
 import semanticAnalyzer.types.PrimitiveType;
@@ -113,6 +115,33 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	@Override
 	public void visitLeave(TypeNode node) {
 		node.setType(PrimitiveType.fromToken(node.typeToken()));
+	}
+	
+	@Override
+	public void visitEnter(IfStatementNode node) {
+		enterSubscope(node);
+	}
+	
+	@Override
+	public void visitLeave(IfStatementNode node) {
+		leaveScope(node);
+		
+		if(!node.child(0).getType().equivalent(PrimitiveType.BOOLEAN)) {
+			typeCheckErrorForControlFlow(node);
+		}
+	}
+	
+	@Override
+	public void visitEnter(WhileStatementNode node) {
+		enterSubscope(node);
+	}
+	@Override
+	public void visitLeave(WhileStatementNode node) {
+		leaveScope(node);
+		
+		if(!node.child(0).getType().equivalent(PrimitiveType.BOOLEAN)) {
+			typeCheckErrorForControlFlow(node);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -217,6 +246,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("attempt to assign to CONST-declared variable at " + token.getLocation());
+	}
+	
+	private void typeCheckErrorForControlFlow(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("Control-flow statement '" + token.getLexeme() + "' needs the condition of type BOOLEAN at " + token.getLocation());
 	}
 
 	private void typeCheckError(ParseNode node, List<Type> operandTypes) {

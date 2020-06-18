@@ -19,6 +19,7 @@ import parseTree.nodeTypes.BlockStatementNode;
 import parseTree.nodeTypes.DeclarationNode;
 import parseTree.nodeTypes.FloatingConstantNode;
 import parseTree.nodeTypes.IdentifierNode;
+import parseTree.nodeTypes.IfStatementNode;
 import parseTree.nodeTypes.IntegerConstantNode;
 import parseTree.nodeTypes.NewlineNode;
 import parseTree.nodeTypes.PrintStatementNode;
@@ -27,6 +28,7 @@ import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
 import parseTree.nodeTypes.TabNode;
 import parseTree.nodeTypes.TypeNode;
+import parseTree.nodeTypes.WhileStatementNode;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -240,6 +242,53 @@ public class ASMCodeGenerator {
 		
 		public void visitLeave(TypeNode node) {
 			newValueCode(node);
+		}
+		
+		public void visitLeave(IfStatementNode node) {
+			Labeller labeller = new Labeller("if");
+			String falseLabel = labeller.newLabel("false");
+			String endLabel = labeller.newLabel("end");
+			
+			newVoidCode(node);
+			
+			ASMCodeFragment condition = removeValueCode(node.child(0));
+			ASMCodeFragment thenClause = removeVoidCode(node.child(1));
+			
+			code.append(condition);
+			code.add(JumpFalse, falseLabel);
+			code.append(thenClause);
+			code.add(Jump, endLabel);
+			
+			code.add(Label, falseLabel);
+			
+			if(hasElseClause(node)) {
+				ASMCodeFragment elseClause = removeVoidCode(node.child(2));
+				code.append(elseClause);
+			}
+			
+			code.add(Label, endLabel);
+		}
+		private boolean hasElseClause(IfStatementNode node) {
+			return node.nChildren() == 3;
+		}
+		
+		public void visitLeave(WhileStatementNode node) {
+			Labeller labeller = new Labeller("while");
+			String startLabel = labeller.newLabel("start");
+			String falseAndEndLabel = labeller.newLabel("falseAndEnd");
+			
+			newVoidCode(node);
+			
+			ASMCodeFragment condition = removeValueCode(node.child(0));
+			ASMCodeFragment whileBlock = removeVoidCode(node.child(1));
+			
+			code.add(Label, startLabel);
+			code.append(condition);
+			code.add(JumpFalse, falseAndEndLabel);
+			code.append(whileBlock);
+			code.add(Jump, startLabel);
+			
+			code.add(Label, falseAndEndLabel);
 		}
 
 		private ASMOpcode opcodeForStore(Type type) {

@@ -14,6 +14,9 @@ public enum Keyword implements Lextant {
 	FALSE("_false_"),
 	EXEC("exec"),
 	NULL_KEYWORD(""),
+	IF("if"),
+	ELSE("else"),
+	WHILE("while"),
 	
 	// Types
 	BOOL("bool"),

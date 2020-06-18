@@ -4,23 +4,7 @@ import java.util.Arrays;
 
 import logging.PikaLogger;
 import parseTree.*;
-import parseTree.nodeTypes.AssignmentStatementNode;
-import parseTree.nodeTypes.BinaryOperatorNode;
-import parseTree.nodeTypes.BooleanConstantNode;
-import parseTree.nodeTypes.CharacterConstantNode;
-import parseTree.nodeTypes.BlockStatementNode;
-import parseTree.nodeTypes.DeclarationNode;
-import parseTree.nodeTypes.ErrorNode;
-import parseTree.nodeTypes.FloatingConstantNode;
-import parseTree.nodeTypes.IdentifierNode;
-import parseTree.nodeTypes.IntegerConstantNode;
-import parseTree.nodeTypes.NewlineNode;
-import parseTree.nodeTypes.PrintStatementNode;
-import parseTree.nodeTypes.ProgramNode;
-import parseTree.nodeTypes.SpaceNode;
-import parseTree.nodeTypes.StringConstantNode;
-import parseTree.nodeTypes.TabNode;
-import parseTree.nodeTypes.TypeNode;
+import parseTree.nodeTypes.*;
 import tokens.*;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
@@ -115,13 +99,21 @@ public class Parser {
 		if(startsAssignmentStatement(nowReading)) {
 			return parseAssignmentStatement();
 		}
+		if(startsIfStatement(nowReading)) {
+			return parseIfStatement();
+		}
+		if(startsWhileStatement(nowReading)) {
+			return parseWhileStatement();
+		}
 		return syntaxErrorNode("statement");
 	}
 	private boolean startsStatement(Token token) {
 		return startsPrintStatement(token) ||
 			   startsDeclaration(token) ||
 			   startsBlockStatement(token) ||
-			   startsAssignmentStatement(token);
+			   startsAssignmentStatement(token) ||
+			   startsIfStatement(token) ||
+			   startsWhileStatement(token);
 	}
 	
 	// assignmentStatement -> target := expr .
@@ -252,7 +244,54 @@ public class Parser {
 		return token.isLextant(Keyword.CONST, Keyword.VAR);
 	}
 
-
+	private ParseNode parseIfStatement() {
+		if(!startsIfStatement(nowReading)) {
+			return syntaxErrorNode("if statement");
+		}
+		Token ifToken = nowReading;
+		readToken();
+		
+		expect(Punctuator.OPEN_PARANTHESES);
+		ParseNode condition = parseExpression();
+		expect(Punctuator.CLOSE_PARENTHESES);
+		ParseNode thenClause = parseBlockStatement();
+		
+		if(startsElseStatement(nowReading)) {
+			@SuppressWarnings("unused")
+			Token elseToken = nowReading;
+			readToken();
+			
+			ParseNode elseClause = parseBlockStatement();
+			
+			return IfStatementNode.withChildren(ifToken, condition, thenClause, elseClause);
+		}
+		
+		return IfStatementNode.withChildren(ifToken, condition, thenClause);
+	}
+	private boolean startsIfStatement(Token token) {
+		return token.isLextant(Keyword.IF);
+	}
+	private boolean startsElseStatement(Token token) {
+		return token.isLextant(Keyword.ELSE);
+	}
+	
+	private ParseNode parseWhileStatement() {
+		if(!startsWhileStatement(nowReading)) {
+			return syntaxErrorNode("while statement");
+		}
+		Token whileToken = nowReading;
+		readToken();
+		
+		expect(Punctuator.OPEN_PARANTHESES);
+		ParseNode condition = parseExpression();
+		expect(Punctuator.CLOSE_PARENTHESES);
+		ParseNode whileBlock = parseBlockStatement();
+		
+		return WhileStatementNode.withChildren(whileToken, condition, whileBlock);
+	}
+	private boolean startsWhileStatement(Token token) {
+		return token.isLextant(Keyword.WHILE);
+	}
 	
 	///////////////////////////////////////////////////////////
 	// expressions

@@ -1,0 +1,10 @@
+exec {
+	var a := 1.
+	
+	while(a <= 5) {
+		const b := a.
+		a := a + b.
+	}
+	
+	print a.
+}

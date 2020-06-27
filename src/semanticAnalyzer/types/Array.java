@@ -15,7 +15,8 @@ public class Array implements Type {
 
 	@Override
 	public int getSize() {
-		return 0;
+//		return subtype.getSize();
+		return 4;
 	}
 
 	@Override
@@ -41,6 +42,10 @@ public class Array implements Type {
 	public Type getConcreteType() {
 		Type concreteSubtype = subtype.getConcreteType();
 		return new Array(concreteSubtype);
+	}
+	
+	public Type getBaseType() {
+		return subtype instanceof Array ? ((Array)this.getSubtype()).getBaseType() : this.getSubtype();
 	}
 
 }

@@ -1,0 +1,6 @@
+exec {
+	 var a := [1,2,3,4].
+	 print a; _n_.
+	 dealloc a.
+	 print a[0]; _n_.
+}

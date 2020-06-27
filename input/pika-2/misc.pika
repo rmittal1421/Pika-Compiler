@@ -1,0 +1,15 @@
+exec {
+
+	#var d := [[1//4,3//5],[2//4, ^c^]].
+	#var b := 2//5 + a[1][1].
+	#print d.
+	
+	var a := 1//2.
+	var r := [1//2,2//3,3//5].
+	
+	print a.
+	print r.
+	
+	#var a := 2.
+	#print [a | rat].
+}

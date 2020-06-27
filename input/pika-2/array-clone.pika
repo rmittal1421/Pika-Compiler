@@ -1,0 +1,13 @@
+exec {
+	const a := alloc [float](4).
+	print a; _n_.
+	
+	const b := clone a.
+	print b; _n_.
+	
+	const c := alloc [char](4).
+	#b := c.
+	
+	b[0] := 10.
+	print a[0] + b[0].
+}

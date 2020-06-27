@@ -1,0 +1,25 @@
+exec {
+ 	var x := alloc [[int]](2). 
+ 	
+ 	#var b := alloc [char](2).
+ 	x[0] := alloc [int](2). 
+ 	x[1] := alloc [int](2).
+ 	
+ 	var b := 0.
+ 	x[0][0] := b.
+ 	x[0][1] := b + 1.
+ 	x[1][0] := b + 2.
+ 	x[1][1] := b + 3.
+ 	
+ 	print x[0][0]; x[0][1]; x[1][0]; x[1][1];.
+ 	
+ 	#const a := alloc [int](5).
+ 	#var b := 0.
+ 	
+ 	#while(b < length a) {
+ 	#	a[b] := b*2.
+ 	#	b := b + 1.
+ 	#}
+ 	
+ 	#print a[0]; a[1]; a[2]; a[3]; a[4]; _n_.
+}

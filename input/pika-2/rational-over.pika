@@ -1,0 +1,4 @@
+exec {
+	const a := 10//1.
+	print 10//0.
+}

@@ -15,10 +15,9 @@ public class IntToCharCodeGenerator implements SimpleCodeGenerator {
 		
 		// If we take bitwise AND of the value on top of stack with 0x111111111 or 127 (integer), we will get the last
 		// 7 bits of the integer which is the character value of that integer.
-		
 		fragment.add(PushI, 127);
 		fragment.add(BTAnd);
-		
+
 		return fragment;
 	}
 	

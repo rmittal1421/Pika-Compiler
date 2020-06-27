@@ -33,10 +33,15 @@ public enum Punctuator implements Lextant {
 	CAST("|"), 
 	ARRAY_INDEXING(""),
 	
-	// boolean operators
+	// Boolean operators
 	AND("&&"),
 	OR("||"),
-	NOT("!");
+	NOT("!"),
+	
+	// Other operators
+	OVER("//"),
+	EXPRESS_OVER("///"),
+	RATIONALIZE("////");
 	
 
 	private String lexeme;

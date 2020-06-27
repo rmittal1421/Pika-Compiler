@@ -73,6 +73,47 @@ public class Macros {
 		frag.add(StoreC);			// []
 	}
 	
+	/** [...] -> [...]
+	 * 	@param frag ASMCodeFragment to add code to
+	 *  @param baseLocation BaseLocation of the record
+	 *  @param offset The offset from base address where the intToWrite needs to go
+	 *  @param intToWrite Value of int which needs to be added
+	 */
+	public static void writeIPBaseOffset(ASMCodeFragment frag, String baseLocation, int offset, int intToWrite) {
+		frag.add(PushI, intToWrite); // [... intToWrite]
+		loadIFrom(frag, baseLocation); // [... intToWrite baseLocation]
+		writeIOffset(frag, offset); // [...]
+	}
+	
+	/** [... intToWrite] -> [...]
+	 * 	@param frag ASMCodeFragment to add code to
+	 *  @param baseLocation BaseLocation of the record
+	 *  @param offset The offset from base address where the intToWrite needs to go
+	 */
+	public static void writeIPtrOffset(ASMCodeFragment frag, String baseLocation, int offset) {
+		loadIFrom(frag, baseLocation); // [... intToWrite baseLocation]
+		writeIOffset(frag, offset); // [...]
+	}
+	
+	public static void loadMakePositiveStore(ASMCodeFragment frag, String baseLocation) {
+		Labeller labeller = new Labeller("macro-make-positive");
+		String makePositive = labeller.newLabel("make-positive");
+		String endLabel = labeller.newLabel("end-label");
+		
+		loadIFrom(frag, baseLocation);    // [... val]
+		frag.add(Duplicate);              // [... val val]
+		frag.add(JumpNeg, makePositive);  // [... val] & jump if val was -ve
+		frag.add(Pop);                    // [...]
+		frag.add(Jump, endLabel);
+		
+		frag.add(Label, makePositive);    // [... val] and val is -ve
+		frag.add(Negate);                 // [... val] and val is +ve
+		storeITo(frag, baseLocation);     // [...]
+		frag.add(Jump, endLabel);
+		
+		frag.add(Label, endLabel);
+	}
+	
 	
 	////////////////////////////////////////////////////////////////////
     // debugging aids

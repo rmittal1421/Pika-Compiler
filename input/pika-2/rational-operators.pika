@@ -1,0 +1,29 @@
+exec {
+	#const a := 40//13.
+	#const b := 9.
+	#var c := a////b.
+	#print c; _n_.
+	
+	var a := 3//4.
+	var b := 5//7.
+	var c := a + b.
+	print c; _n_.
+	c := a - b.
+	print c; _n_.
+	c := a * b.
+	print c; _n_.
+	c := a / b.
+	print c; _n_.
+	
+	var d := 3//5.
+	var e := 9//5.
+	#print d < e.
+	print d < e; d > e; d >= e; d <= e; d == e; d != e; _n_.
+	
+	var f := [ e | float ].
+	
+	var g := 5.
+	var h := [[g | float ] | rat].
+	h := h + 1//5.
+	print h.
+}

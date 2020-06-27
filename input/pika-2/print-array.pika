@@ -1,0 +1,18 @@
+exec {
+	const a := [[1,2,3],[4,5],[6,7,8],alloc [int](0)].
+	print a; _n_.
+	
+	print length a; _n_.
+	
+	const b := [[[1,2],[3,4]],[[5,6],[7,8]]].
+	print b; _n_.
+	print length b[0]; _n_.
+	
+	#print a == b; _n_.
+	
+	const c := a.
+	print a == c; _n_.
+	
+	const d := b.
+	print d == b; _n_.
+}

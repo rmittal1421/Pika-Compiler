@@ -51,6 +51,9 @@ public class FunctionSignature {
 	public boolean isNull() {
 		return false;
 	}
+	public Type[] getParamTypes() {
+		return paramTypes;
+	}
 	
 	
 	///////////////////////////////////////////////////////////////
@@ -77,7 +80,7 @@ public class FunctionSignature {
 		return variableType.equivalent(valueType);
 	}
 	private void resetTypeVariables() {
-		for(TypeVariable T: typeVariables) {
+		for(TypeVariable T: this.typeVariables) {
 			T.reset();
 		}
 	}

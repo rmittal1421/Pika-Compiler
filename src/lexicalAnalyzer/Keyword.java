@@ -17,13 +17,18 @@ public enum Keyword implements Lextant {
 	IF("if"),
 	ELSE("else"),
 	WHILE("while"),
+	ALLOC("alloc"),
+	CLONE("clone"),
+	LENGTH("length"),
+	DEALLOC("dealloc"),
 	
 	// Types
 	BOOL("bool"),
 	CHAR("char"),
 	STRING("string"),
 	INT("int"),
-	FLOAT("float");
+	FLOAT("float"),
+	RAT("rat");
 	
 
 	private String lexeme;

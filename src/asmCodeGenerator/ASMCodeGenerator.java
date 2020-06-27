@@ -1,16 +1,20 @@
 package asmCodeGenerator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMOpcode;
+import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
 import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
 import parseTree.*;
+import parseTree.nodeTypes.PopulatedArrayNode;
 import parseTree.nodeTypes.AssignmentStatementNode;
 import parseTree.nodeTypes.BinaryOperatorNode;
 import parseTree.nodeTypes.BooleanConstantNode;
@@ -28,7 +32,9 @@ import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.StringConstantNode;
 import parseTree.nodeTypes.TabNode;
 import parseTree.nodeTypes.TypeNode;
+import parseTree.nodeTypes.UnaryOperatorNode;
 import parseTree.nodeTypes.WhileStatementNode;
+import semanticAnalyzer.types.Array;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -53,10 +59,15 @@ public class ASMCodeGenerator {
 	public ASMCodeFragment makeASM() {
 		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
 
+		// Code which should be in the pathway before actual application code
+		code.append(MemoryManager.codeForInitialization());
+		
 		code.append(RunTime.getEnvironment());
 		code.append(globalVariableBlockASM());
 		code.append(programASM());
-//		code.append( MemoryManager.codeForAfterApplication() );
+		
+		// Memory heap manger goes after the main program where main program is the programASM
+		code.append( MemoryManager.codeForAfterApplication() );
 
 		return code;
 	}
@@ -86,6 +97,136 @@ public class ASMCodeGenerator {
 		CodeVisitor visitor = new CodeVisitor();
 		root.accept(visitor);
 		return visitor.removeRootCode(root);
+	}
+	
+//	public static ASMCodeFragment
+	
+	public static void createRecord(ASMCodeFragment code, int typecode, int statusFlags) {
+		code.add(Call, MemoryManager.MEM_MANAGER_ALLOCATE);
+		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.RECORD_TYPEID_OFFSET, typecode);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.RECORD_STATUS_OFFSET, statusFlags);
+	}
+	
+	// Stack: [... nElems]
+	public static void createEmptyArrayRecord(ASMCodeFragment code, int statusFlags, int subtypeSize) {
+		final int typecode = Record.ARRAY_TYPE_ID;
+		
+		// Give error if nElements < 0
+		code.add(Duplicate);           // [... nElems nElems]
+		code.add(JumpNeg, RunTime.NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR);   // [... nElems]
+		
+		// Compute record size (Includes ASM header + aggregated size of elements)
+		code.add(Duplicate);           // [... nElems nElems]
+		code.add(PushI, subtypeSize);  // [... nElems nElems subtypeSize]
+		code.add(Multiply);            // [... nElems nElems*subtypeSize] === [... nElems elemsSize]
+		code.add(Duplicate);           // [... nElems elemsSize elemsSize]
+		Macros.storeITo(code, RunTime.ARRAY_DATASIZE_TEMPORARY);  // [... nElems elemsSize]
+		code.add(PushI, Record.ARRAY_HEADER_SIZE); // [... nElems elemsSize headerSize]
+		code.add(Add);     // [... nElems recordSize]
+		
+		// Call createRecord
+		createRecord(code, typecode, statusFlags);   // [... nElems]
+		
+		// Zero out elements of array
+		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);  // [... nElems recordPointer]
+		code.add(PushI, Record.ARRAY_HEADER_SIZE);    // [... nElems recordPointer arrayHeaderSize]
+		code.add(Add);                                // [... nElems baseAddressToAddFirstElement]
+		Macros.loadIFrom(code, RunTime.ARRAY_DATASIZE_TEMPORARY);  // [... nElems baseAddressToAddFirstElement numBytes]
+		code.add(Call, RunTime.CLEAR_N_BYTES);
+		
+		// Fill in array header
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_SUBTYPE_SIZE_OFFSET, subtypeSize);
+		Macros.writeIPtrOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_LENGTH_OFFSET);
+	}
+	
+	// Stack: [... recordSize]
+	public static void createPopulatedArrayRecord(ASMCodeFragment code, int statusFlags, Type subtype, List<ASMCodeFragment> codeForChildren) {
+		assert codeForChildren.size() > 0;
+	
+		int subtypeSize = subtype.getSize();
+		final int typecode = Record.ARRAY_TYPE_ID;
+		
+		createRecord(code, typecode, statusFlags);                     // [...]
+		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);     // [... recordPointer]
+		
+		// We need to duplicate this since the recordPointer stored in RECORD_CREATION_TEMPORARY might be replaced by one of 
+		// children of this node as they can be an array too and they will use that runtime variable. Hence, later when we want
+		// to put that on stack, we will load the wrong one as it is replaced. So duplicate it, after adding all the children's code
+		// storeItBack and then load later.
+		code.add(Duplicate);
+		
+		code.add(PushI, Record.ARRAY_HEADER_SIZE);                     // [... recordPointer arrayHeaderSize]
+		code.add(Add);                                                 // [... baseAddressForFirstElement]
+		
+//		ASMCodeFragment opcodeForStore = opcodeForStore(subtype);
+		
+		for(ASMCodeFragment cCode: codeForChildren) {                  // [... baseAddressforNthElement]
+			code.add(Duplicate);                                       // [... baseAddressForNthElement baseAddressForNthElement]
+			code.append(cCode);                                        // [... baseAddressForNthElement baseAddressForNthElement cCode]
+			code.append(opcodeForStore(subtype));                               // [... baseAddressForNthElement]
+//			code.add(StoreI);
+			code.add(PushI, subtypeSize);                              // [... baseAddressForNthElement subtypeSize]
+			code.add(Add);                                             // [... baseAddressFor(N+1)thElement]
+		}
+		code.add(Pop);                                                 // [... baseAddressForFirstElement]
+		
+		// Fill in array header
+		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_SUBTYPE_SIZE_OFFSET, subtypeSize);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_LENGTH_OFFSET, codeForChildren.size());
+	}
+	
+	// Spits out fragment for storing a value
+	public static ASMCodeFragment opcodeForStore(Type type) {
+		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+		if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING || type instanceof Array) {
+			frag.add(StoreI);
+		}
+		else if (type == PrimitiveType.FLOATING) {
+			frag.add(StoreF);
+		}
+		else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
+			frag.add(StoreC);
+		}
+		else if (type == PrimitiveType.RATIONAL) {
+			// Stack is: [.. pointerToStoreIn num den]
+			Macros.storeITo(frag, RunTime.RATIONAL_DEN);
+			Macros.storeITo(frag, RunTime.RATIONAL_NUM);
+			frag.add(Duplicate);
+			frag.add(PushI, 4);
+			frag.add(Add);
+			Macros.loadIFrom(frag, RunTime.RATIONAL_DEN);
+			frag.add(StoreI);
+			Macros.loadIFrom(frag, RunTime.RATIONAL_NUM);
+			frag.add(StoreI);
+		} else {
+			assert false : "Type " + type + " unimplemented in opcodeForStore()";
+		}
+		return frag;
+	}
+	
+	public static ASMCodeFragment opcodeForLoad(Type type) {
+		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array) {
+			frag.add(LoadI);
+		} else if (type == PrimitiveType.FLOATING) {
+			frag.add(LoadF);
+		} else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
+			frag.add(LoadC);
+		} else if(type == PrimitiveType.RATIONAL) {
+			// Stack : [... addressOfRationalNumber]
+			frag.add(Duplicate);
+			frag.add(PushI, 4);
+			frag.add(Add);
+			frag.add(LoadI);
+			frag.add(Exchange);
+			frag.add(LoadI);
+			frag.add(Exchange);
+		} else {
+			assert false : "Type " + type + " unimplemented in opcodeForLoad()";
+		}
+		return frag;
 	}
 
 	protected class CodeVisitor extends ParseNodeVisitor.Default {
@@ -154,12 +295,21 @@ public class ASMCodeGenerator {
 		}
 
 		private void turnAddressIntoValue(ASMCodeFragment code, ParseNode node) {
-			if (node.getType() == PrimitiveType.INTEGER || node.getType() == PrimitiveType.STRING) {
+			if (node.getType() == PrimitiveType.INTEGER || node.getType() == PrimitiveType.STRING || node.getType() instanceof Array) {
 				code.add(LoadI);
 			} else if (node.getType() == PrimitiveType.FLOATING) {
 				code.add(LoadF);
 			} else if (node.getType() == PrimitiveType.BOOLEAN || node.getType() == PrimitiveType.CHARACTER) {
 				code.add(LoadC);
+			} else if(node.getType() == PrimitiveType.RATIONAL) {
+				// Stack : [... addressOfRationalNumber]
+				code.add(Duplicate);
+				code.add(PushI, 4);
+				code.add(Add);
+				code.add(LoadI);
+				code.add(Exchange);
+				code.add(LoadI);
+				code.add(Exchange);
 			} else {
 				assert false : "node " + node;
 			}
@@ -225,7 +375,7 @@ public class ASMCodeGenerator {
 			code.append(rvalue);
 
 			Type type = node.getType();
-			code.add(opcodeForStore(type));
+			code.append(opcodeForStore(type));
 		}
 		
 		public void visitLeave(AssignmentStatementNode node) {
@@ -237,7 +387,7 @@ public class ASMCodeGenerator {
 			code.append(rvalue);
 			
 			Type type = node.getType();
-			code.add(opcodeForStore(type));
+			code.append(opcodeForStore(type));
 		}
 		
 		public void visitLeave(TypeNode node) {
@@ -291,22 +441,61 @@ public class ASMCodeGenerator {
 			code.add(Label, falseAndEndLabel);
 		}
 
-		private ASMOpcode opcodeForStore(Type type) {
-			if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING) {
-				return StoreI;
+		private ASMCodeFragment opcodeForStore(Type type) {
+			ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+			if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING || type instanceof Array) {
+				frag.add(StoreI);
 			}
-			if (type == PrimitiveType.FLOATING) {
-				return StoreF;
+			else if (type == PrimitiveType.FLOATING) {
+				frag.add(StoreF);
 			}
-			if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
-				return StoreC;
+			else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
+				frag.add(StoreC);
 			}
-			assert false : "Type " + type + " unimplemented in opcodeForStore()";
-			return null;
+			else if (type == PrimitiveType.RATIONAL) {
+				// Stack is: [.. pointerToStoreIn num den]
+				Macros.storeITo(frag, RunTime.RATIONAL_DEN);
+				Macros.storeITo(frag, RunTime.RATIONAL_NUM);
+				frag.add(Duplicate);
+				frag.add(PushI, 4);
+				frag.add(Add);
+				Macros.loadIFrom(frag, RunTime.RATIONAL_DEN);
+				frag.add(StoreI);
+				Macros.loadIFrom(frag, RunTime.RATIONAL_NUM);
+				frag.add(StoreI);
+			} else {
+				assert false : "Type " + type + " unimplemented in opcodeForStore()";
+			}
+			return frag;
 		}
 
 		///////////////////////////////////////////////////////////////////////////
 		// expressions
+		public void visitLeave(UnaryOperatorNode node) {
+			newValueCode(node);
+			
+			ASMCodeFragment arg = removeValueCode(node.child(0));
+			code.append(arg);
+			
+			Object variant = node.getSignature().getVariant();
+			if (variant instanceof ASMOpcode) {
+				ASMOpcode opcode = (ASMOpcode) variant;
+				code.add(opcode);
+			} else if(variant instanceof SimpleCodeGenerator) {
+				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
+				ASMCodeFragment fragment = generator.generate(node);
+				code.append(fragment);
+
+				if (fragment.isAddress()) {
+					// Which means that the fragment returns a pointer
+					code.markAsAddress(); // Now we know that this code is a pointer
+				} else if(fragment.isVoid()) {
+					code.markAsVoid();
+				}
+
+			}
+		}
+		
 		public void visitLeave(BinaryOperatorNode node) {
 			Lextant operator = node.getOperator();
 
@@ -338,11 +527,23 @@ public class ASMCodeGenerator {
 			code.append(arg2);
 			code.add(Label, subLabel);
 
-			assert (node.child(0).getType() == node.child(1).getType());
+			assert (node.child(0).getType().equivalent(node.child(1).getType()));
+			Type type = node.child(0).getType();
 			assert (operator instanceof Punctuator);
 
 			Punctuator punctuator = (Punctuator) operator;
-			boolean isFloating = node.child(0).getType() == PrimitiveType.FLOATING;
+			
+			boolean isFloating = type == PrimitiveType.FLOATING;
+			
+			if(type == PrimitiveType.RATIONAL) {
+				// Stack currently has: [num1 den1 num2 den2] and I want [num1*den2 num2*den1] for comparisons
+				Macros.storeITo(code, RunTime.RATIONAL_DEN);      // [num1 den1 num2]
+				code.add(Multiply);                               // [num1 den1*num2]
+				code.add(Exchange);                               // [den1*num2 num1]
+				Macros.loadIFrom(code, RunTime.RATIONAL_DEN);     // [den1*num2 num1 den2]
+				code.add(Multiply);                               // [den1*num2 num1*den2]
+				code.add(Exchange);                               // [num1*den2 den1*num2]
+			}
 
 			code.add(isFloating ? FSubtract : Subtract);
 			
@@ -478,6 +679,24 @@ public class ASMCodeGenerator {
 			code.add(DLabel, thisStringLabel);
 			code.add(DataS, node.getValue());
 			code.add(PushD, thisStringLabel);
+		}
+		
+		public void visitLeave(PopulatedArrayNode node) {
+			newValueCode(node);
+			
+			Type subtype = ((Array)node.getType()).getSubtype();
+			int statusFlags = subtype instanceof Array ? Record.STATUS_FLAG_FOR_REFERENCE : Record.STATUS_FLAG_FOR_NON_REFERENCE;
+			int nElems = node.nChildren();
+			ArrayList<ASMCodeFragment> codeForChildren = new ArrayList<>(nElems);
+			for(ParseNode cNode: node.getChildren()) {
+				codeForChildren.add(removeValueCode(cNode));
+			}
+			int recordSize = Record.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
+			code.add(PushI, recordSize); // [... recordSize] before calling to create a record
+			createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
+			
+			// Place the created record's address on the stack
+			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 		}
 	}
 

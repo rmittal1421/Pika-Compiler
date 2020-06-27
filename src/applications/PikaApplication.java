@@ -49,7 +49,8 @@ public class PikaApplication {
 		return (!filePath.endsWith(File.separator));
 	}
 	protected static String outputFilename(String filename) {
-		return outputDirectory + basename(filename) + ".asm";
+//		return outputDirectory + basename(filename) + ".asm";
+		return outputDirectory + "pika-2" + ".asm";
 	}
 	// removes preceding directory names and the file extension
 	// e.g. /usr/root/tricks/bigBag.cpp  ->  bigBag

@@ -1,0 +1,5 @@
+exec {
+	const a := _true_.
+	const b := !(!a).
+	print a; b.
+}

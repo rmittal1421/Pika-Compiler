@@ -9,6 +9,8 @@ public enum PrimitiveType implements Type {
 	INTEGER(4, Keyword.INT),
 	FLOATING(8, Keyword.FLOAT),
 	STRING(4, Keyword.STRING),
+	RATIONAL(8, Keyword.RAT),
+	
 	ERROR(0, Keyword.NULL_KEYWORD),		// use as a value when a syntax error has occurred
 	NO_TYPE(0, "");						// use as a value when no type has been assigned.
 	
@@ -56,5 +58,16 @@ public enum PrimitiveType implements Type {
 			}
 		}
 		return ERROR;
+	}
+	
+	private static final Type[] typesInvolvedInPromotions = { CHARACTER, INTEGER, FLOATING, RATIONAL };
+	
+	public static boolean isATypeInvolvedInPromotions(Type otherType) {
+		for(Type type: typesInvolvedInPromotions) {
+			if(type.equals(otherType)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -18,6 +18,11 @@ public class TypeNode extends ParseNode {
 		return token;
 	}
 	
+	public static TypeNode withChildren(Token token, ParseNode child) {
+		TypeNode node = new TypeNode(token);
+		node.appendChild(child);
+		return node;
+	}
 	
 	///////////////////////////////////////////////////////////
 	// boilerplate for visitors

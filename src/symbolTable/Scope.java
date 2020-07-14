@@ -15,9 +15,22 @@ public class Scope {
 //////////////////////////////////////////////////////////////////////
 // factories
 
+	// Program scope
 	public static Scope createProgramScope() {
 		return new Scope(programScopeAllocator(), nullInstance());
 	}
+	
+	// Parameter scope
+	public Scope createParameterScope() {
+		return new Scope(parameterScopeAllocator(), this);
+	}
+	
+	// Procedure scope
+	public Scope createProcedureScope() {
+		return new Scope(procedureScopeAllocator(), this);
+	}
+	
+	// Subscope
 	public Scope createSubscope() {
 		return new Scope(allocator, this);
 	}
@@ -28,6 +41,19 @@ public class Scope {
 				MemoryLocation.GLOBAL_VARIABLE_BLOCK);
 	}
 	
+	private MemoryAllocator parameterScopeAllocator() {
+		return new ParameterMemoryAllocator(
+				MemoryAccessMethod.INDIRECT_ACCESS_BASE,
+				MemoryLocation.FRAME_POINTER);
+	}
+	
+	private MemoryAllocator procedureScopeAllocator() {
+		return new NegativeMemoryAllocator(
+				MemoryAccessMethod.INDIRECT_ACCESS_BASE,
+				MemoryLocation.FRAME_POINTER,
+				-8);
+	}
+	
 //////////////////////////////////////////////////////////////////////
 // private constructor.	
 	private Scope(MemoryAllocator allocator, Scope baseScope) {
@@ -36,6 +62,7 @@ public class Scope {
 		this.symbolTable = new SymbolTable();
 		
 		this.allocator = allocator;
+		
 		allocator.saveState();
 	}
 	

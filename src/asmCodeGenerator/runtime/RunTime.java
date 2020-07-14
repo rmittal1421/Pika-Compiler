@@ -29,6 +29,8 @@ public class RunTime {
 	public static final String ARRAY_SEPARATOR_SIGN_STRING = "array-separator-sign-string";
 	public static final String RETURN_PC = "return-pc";
 	public static final String GLOBAL_MEMORY_BLOCK = "$global-memory-block";
+	public static final String FRAME_POINTER = "$frame-pointer";
+	public static final String STACK_POINTER = "$stack-pointer";
 	public static final String USABLE_MEMORY_START = "$usable-memory-start";
 	public static final String MAIN_PROGRAM_LABEL = "$$main";
 	
@@ -62,6 +64,7 @@ public class RunTime {
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
+		result.append(pointersForLambdas());
 		result.append(jumpToMain());
 		result.append(stringsForPrintf());
 		result.append(runtimeErrors());
@@ -71,6 +74,22 @@ public class RunTime {
 		result.append(lowestTerms());
 		result.add(DLabel, USABLE_MEMORY_START);
 		return result;
+	}
+	
+	private ASMCodeFragment pointersForLambdas() {
+		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+		
+		// Declare and store for frame pointer
+		Macros.declareI(frag, FRAME_POINTER);
+		frag.add(Memtop);
+		Macros.storeITo(frag, FRAME_POINTER);
+		
+		// Declare and store for stack pointer
+		Macros.declareI(frag, STACK_POINTER);
+		frag.add(Memtop);
+		Macros.storeITo(frag, STACK_POINTER);
+		
+		return frag;
 	}
 
 	private ASMCodeFragment jumpToMain() {

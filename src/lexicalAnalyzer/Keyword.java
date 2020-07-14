@@ -21,6 +21,8 @@ public enum Keyword implements Lextant {
 	CLONE("clone"),
 	LENGTH("length"),
 	DEALLOC("dealloc"),
+	FUNC("func"),
+	CALL("call"),
 	
 	// Types
 	BOOL("bool"),
@@ -28,7 +30,10 @@ public enum Keyword implements Lextant {
 	STRING("string"),
 	INT("int"),
 	FLOAT("float"),
-	RAT("rat");
+	RAT("rat"),
+	
+	// Other Types
+	NULL("null");
 	
 
 	private String lexeme;

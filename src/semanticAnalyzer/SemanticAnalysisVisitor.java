@@ -10,30 +10,12 @@ import lexicalAnalyzer.Punctuator;
 import logging.PikaLogger;
 import parseTree.ParseNode;
 import parseTree.ParseNodeVisitor;
-import parseTree.nodeTypes.PopulatedArrayNode;
-import parseTree.nodeTypes.AssignmentStatementNode;
-import parseTree.nodeTypes.BinaryOperatorNode;
-import parseTree.nodeTypes.BooleanConstantNode;
-import parseTree.nodeTypes.CharacterConstantNode;
-import parseTree.nodeTypes.BlockStatementNode;
-import parseTree.nodeTypes.DeclarationNode;
-import parseTree.nodeTypes.ErrorNode;
-import parseTree.nodeTypes.IdentifierNode;
-import parseTree.nodeTypes.IfStatementNode;
-import parseTree.nodeTypes.IntegerConstantNode;
-import parseTree.nodeTypes.FloatingConstantNode;
-import parseTree.nodeTypes.NewlineNode;
-import parseTree.nodeTypes.PrintStatementNode;
-import parseTree.nodeTypes.ProgramNode;
-import parseTree.nodeTypes.SpaceNode;
-import parseTree.nodeTypes.StringConstantNode;
-import parseTree.nodeTypes.TabNode;
-import parseTree.nodeTypes.TypeNode;
-import parseTree.nodeTypes.UnaryOperatorNode;
-import parseTree.nodeTypes.WhileStatementNode;
+import parseTree.nodeTypes.*;
 import semanticAnalyzer.signatures.FunctionSignature;
 import semanticAnalyzer.signatures.FunctionSignatures;
 import semanticAnalyzer.types.Array;
+import semanticAnalyzer.types.Lambda;
+import semanticAnalyzer.types.NullType;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -52,6 +34,38 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	@Override
 	public void visitEnter(ProgramNode node) {
 		enterProgramScope(node);
+		performFirstVisit(node);
+	}
+	
+	private void performFirstVisit(ProgramNode node) {
+		for(ParseNode child: node.getChildren()) {
+			if(child instanceof FunctionNode) {
+				assert child.nChildren() == 2;
+				
+				// Fetch the identifier
+				IdentifierNode identifierNode = (IdentifierNode)child.child(0);
+				
+				// Fetch the signature of lambda
+				List<Type> paramTypes = new ArrayList<>();
+				Type returnType = PrimitiveType.ERROR;
+				
+				for(ParseNode lChild: child.child(1).getChildren()) {
+					if(lChild instanceof ParameterSpecificationNode) {
+						lChild.accept(this);
+						paramTypes.add(lChild.getType());
+					} else if(lChild instanceof TypeNode) {
+						lChild.accept(this);
+						returnType = lChild.getType();
+					}
+				}
+				
+				Type functionLambdaType = new Lambda(paramTypes, returnType);
+				child.setType(functionLambdaType);
+				child.child(1).setType(functionLambdaType);
+				
+				addBinding(identifierNode, functionLambdaType, ((FunctionNode) child).getDeclarationType());
+			}
+		}
 	}
 
 	public void visitLeave(ProgramNode node) {
@@ -59,6 +73,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	}
 
 	public void visitEnter(BlockStatementNode node) {
+		if(node.getParent() instanceof LambdaNode) {
+			enterProcedureScope(node);
+			return;
+		}
+		
 		enterSubscope(node);
 	}
 
@@ -72,6 +91,18 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Scope scope = Scope.createProgramScope();
 		node.setScope(scope);
 	}
+	
+	private void enterParameterScope(ParseNode node) {
+		Scope baseScope = node.getLocalScope();
+		Scope scope = baseScope.createParameterScope();
+		node.setScope(scope);
+	}
+	
+	private void enterProcedureScope(ParseNode node) {
+		Scope baseScope = node.getLocalScope();
+		Scope scope = baseScope.createProcedureScope();
+		node.setScope(scope);
+	}
 
 	private void enterSubscope(ParseNode node) {
 		Scope baseScope = node.getLocalScope();
@@ -81,6 +112,39 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 	private void leaveScope(ParseNode node) {
 		node.getScope().leave();
+	}
+	
+	///////////////////////////////////////////////////////////////////////////
+	// function handlers
+	@Override
+	public void visitEnter(FunctionNode node) {
+	}
+	
+	@Override
+	public void visitLeave(FunctionNode node) {
+	}
+	
+	@Override
+	public void visitEnter(LambdaNode node) {
+		enterParameterScope(node);
+	}
+	
+	@Override
+	public void visitLeave(LambdaNode node) {
+		leaveScope(node);
+	}
+	
+	@Override
+	public void visitEnter(ParameterSpecificationNode node) {
+	}
+	
+	@Override
+	public void visitLeave(ParameterSpecificationNode node) {
+		Type paramType = node.child(0).getType();
+		IdentifierNode identifierNode = (IdentifierNode) node.child(1);
+		identifierNode.setType(paramType);
+		node.setType(paramType);
+		addBinding(identifierNode, paramType, node.getDeclarationType());
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -115,7 +179,6 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			} else {
 				typeCheckError(node, Arrays.asList(target.getType(), expression.getType()));
 			}
-//			typeCheckError(node, Arrays.asList(target.getType(), expression.getType()));
 		}
 
 		if (target instanceof IdentifierNode) {
@@ -133,7 +196,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	@Override
 	public void visitLeave(TypeNode node) {
 		if(!node.getToken().isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
-			node.setType(PrimitiveType.fromToken(node.typeToken()));
+			if(node.getToken().isLextant(Keyword.NULL)) {
+				node.setType(new NullType());
+			} else {
+				node.setType(PrimitiveType.fromToken(node.typeToken()));
+			}
 		} else { 
 			node.setType(new Array(node.child(0).getType()));
 		}
@@ -181,10 +248,17 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		} else if(node.getToken().isLextant(Punctuator.NOT) && !(childTypes.get(0).equivalent(PrimitiveType.BOOLEAN))) {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
+		} else if(node.getToken().isLextant(Keyword.CALL) && !(node.child(0) instanceof KNaryOperatorNode && node.child(0).child(0).getType() instanceof Lambda)) {
+			typeCheckError(node, childTypes);
+			node.setType(PrimitiveType.ERROR);
+			return;
 		}
 		
 		if(node.getToken().isLextant(Keyword.CLONE)) {
 			node.setType(node.child(0).getType());
+		} else if(node.getToken().isLextant(Keyword.CALL)) {
+			node.setType(node.child(0).getType());
+			return;
 		}
 
 		FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
@@ -194,7 +268,6 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			node.setType(signature.resultType());
 			node.setSignature(signature);
 		} else {
-			// Try promoting and check again
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
 		}
@@ -205,8 +278,39 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		return token.getLextant();
 	}
 	
-//	private Type[] charCast = {PrimitiveType.INTEGER, PrimitiveType.FLOATING, PrimitiveType.RATIONAL};
-//	private Type[] intCast = {PrimitiveType.FLOATING, PrimitiveType.RATIONAL};
+	@Override
+	public void visitLeave(KNaryOperatorNode node) {
+		// As of now, KNaryOperatorNodes are used just for function invocations
+		assert node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION);
+		assert node.nChildren() > 0;
+		
+		Lambda lambdaType = (Lambda) node.child(0).getType();
+		
+		// Check types of params against the children types
+		ArrayList<Type> paramTypes = new ArrayList<>();
+		for(int i = 1; i < node.nChildren(); i++) {
+			paramTypes.add(node.child(i).getType());
+		}
+		
+		if(lambdaType.equivalentParams(paramTypes)) {
+			/*
+			 * Two cases:
+			 * 1. If return type is null and not called by 'call' -> error node
+			 * 2. All other cases
+			 */
+			
+			Type returnType = lambdaType.getReturnType();
+			if(!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
+				funcReturnNullUsedAsAssignment(node);
+				node.setType(PrimitiveType.ERROR);
+			}
+			node.setType(lambdaType.getReturnType());
+		} else {
+			// error
+			typeCheckError(node, paramTypes);
+			node.setType(PrimitiveType.ERROR);
+		}
+	}
 	
 	private void promoteNode(ParseNode node, Type typeToCastTo, int childNumber) {
 		ParseNode childToReplace = node.child(childNumber);
@@ -391,14 +495,6 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(PopulatedArrayNode node) {
 		assert node.nChildren() > 0;
 		Type type = node.child(0).getType();
-//		for(ParseNode child: node.getChildren()) {
-//			if(!child.getType().equivalent(type)) {
-//				// typeCheckError
-//				typeCheckError(node, )
-//			}
-//		}
-//		node.setType(new Array(type));
-//		return;
 		
 		if(type instanceof PrimitiveType) {
 			// Only then promotions are allowed
@@ -464,7 +560,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	// IdentifierNodes, with helper methods
 	@Override
 	public void visit(IdentifierNode node) {
-		if (!isBeingDeclared(node)) {
+		if (!isBeingDeclared(node) && !isUsedAsFunctionParameter(node)) {
 			Binding binding = node.findVariableBinding();
 
 			node.setType(binding.getType());
@@ -476,6 +572,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	private boolean isBeingDeclared(IdentifierNode node) {
 		ParseNode parent = node.getParent();
 		return (parent instanceof DeclarationNode) && (node == parent.child(0));
+	}
+	
+	private boolean isUsedAsFunctionParameter(IdentifierNode node) {
+		ParseNode parent = node.getParent();
+		return (parent instanceof ParameterSpecificationNode);
 	}
 
 	private void addBinding(IdentifierNode identifierNode, Type type, Lextant declareLextant) {
@@ -500,6 +601,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 				+ token.getLocation());
 	}
 
+	@SuppressWarnings("unused")
 	private void typeCheckERrorForArrayInitialization(ParseNode node) {
 		Token token = node.getToken();
 
@@ -512,6 +614,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 		logError("operator " + token.getLexeme() + " not defined for types " + operandTypes + " at "
 				+ token.getLocation());
+	}
+	
+	private void funcReturnNullUsedAsAssignment(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("Function returns null which cannot be used in assignment at " + token.getLocation());
 	}
 
 	private void logError(String message) {

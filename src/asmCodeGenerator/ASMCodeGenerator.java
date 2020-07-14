@@ -99,8 +99,6 @@ public class ASMCodeGenerator {
 		return visitor.removeRootCode(root);
 	}
 	
-//	public static ASMCodeFragment
-	
 	public static void createRecord(ASMCodeFragment code, int typecode, int statusFlags) {
 		code.add(Call, MemoryManager.MEM_MANAGER_ALLOCATE);
 		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);

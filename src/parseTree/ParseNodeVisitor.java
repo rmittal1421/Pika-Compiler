@@ -12,6 +12,9 @@ public interface ParseNodeVisitor {
 	void visitEnter(UnaryOperatorNode node);
 	void visitLeave(UnaryOperatorNode node);
 	
+	void visitEnter(KNaryOperatorNode node);
+	void visitLeave(KNaryOperatorNode node);
+	
 	void visitEnter(BlockStatementNode node);
 	void visitLeave(BlockStatementNode node);
 	
@@ -29,6 +32,15 @@ public interface ParseNodeVisitor {
 	
 	void visitEnter(ProgramNode node);
 	void visitLeave(ProgramNode node);
+	
+	void visitEnter(FunctionNode node);
+	void visitLeave(FunctionNode node);
+	
+	void visitEnter(LambdaNode node);
+	void visitLeave(LambdaNode node);
+	
+	void visitEnter(ParameterSpecificationNode node);
+	void visitLeave(ParameterSpecificationNode node);
 	
 	void visitEnter(TypeNode node);
 	void visitLeave(TypeNode node);
@@ -78,6 +90,12 @@ public interface ParseNodeVisitor {
 			defaultVisitEnter(node);
 		}
 		public void visitLeave(UnaryOperatorNode node) {
+			defaultVisitLeave(node);
+		}
+		public void visitEnter(KNaryOperatorNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(KNaryOperatorNode node) {
 			defaultVisitLeave(node);
 		}
 		public void visitEnter(DeclarationNode node) {
@@ -132,6 +150,24 @@ public interface ParseNodeVisitor {
 			defaultVisitEnter(node);
 		}
 		public void visitLeave(ProgramNode node) {
+			defaultVisitLeave(node);
+		}
+		public void visitEnter(FunctionNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(FunctionNode node) {
+			defaultVisitLeave(node);
+		}
+		public void visitEnter(LambdaNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(LambdaNode node) {
+			defaultVisitLeave(node);
+		}
+		public void visitEnter(ParameterSpecificationNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(ParameterSpecificationNode node) {
 			defaultVisitLeave(node);
 		}
 		public void visitEnter(PopulatedArrayNode node) {

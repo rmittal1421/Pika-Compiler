@@ -149,6 +149,7 @@ public class ParseNode {
 // for visitors
 			
 	public void accept(ParseNodeVisitor visitor) {
+//		assert(visitor instanceof SemanticAnalysisVisitor)
 		visitor.visitEnter(this);
 		visitChildren(visitor);
 		visitor.visitLeave(this);

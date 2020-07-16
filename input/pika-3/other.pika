@@ -1,0 +1,44 @@
+#func foo <>->null{
+#    print "foo called",_n_.
+#    return.
+#}
+
+#exec {
+#    const foo := <>->null {print "Overriding foo in this scope". return. }.
+#    const bar := <>->null {
+#         call foo().
+#         return.
+#     }.
+#     call bar().
+#}
+
+#exec {
+#	const a := 1.
+#	const b := <>->int{
+#		return a.
+#	}.
+#	
+#	print b().
+#}
+
+func printThis<<int>->null printThis> -> null {
+	call printThis(10).
+	return.
+}
+
+exec {
+    #const foo := 1 . 
+    #var bar := <int foo> -> null {
+    #    print foo ;_n_ . 
+    #    return . 
+    #} .
+    
+    #const arr := [bar, bar, bar, bar].
+    
+    #print arr.
+    #const a := alloc [int](4).
+    
+    #const arr := alloc [[[int]]] (3).
+    
+    call printThis(<int a>->null {print a;. return.}). 
+}

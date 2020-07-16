@@ -5,7 +5,7 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.Labeller;
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.Record;
+import asmCodeGenerator.ASMConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 
 public class RunTime {
@@ -27,6 +27,7 @@ public class RunTime {
 	public static final String OPEN_BRACKET_SIGN_STRING = "$open-bracket-sign-string";
 	public static final String CLOSE_BRACKET_SIGN_STRING = "$close-bracket-sign-string";
 	public static final String ARRAY_SEPARATOR_SIGN_STRING = "array-separator-sign-string";
+	public static final String LAMBDA_PRINT_STRING = "lambda-print-string";
 	public static final String RETURN_PC = "return-pc";
 	public static final String GLOBAL_MEMORY_BLOCK = "$global-memory-block";
 	public static final String FRAME_POINTER = "$frame-pointer";
@@ -61,6 +62,7 @@ public class RunTime {
 	public static final String NULL_ARRAY_RUNTIME_ERROR = "$$array-null-error";
 	public static final String INDEX_OUT_OF_BOUNDS_RUNTIME_ERROR = "$$array-index-out-of-bound-error";
 	public static final String NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR = "$$array-length-negative";
+	public static final String NO_RETURN_IN_LAMBDA = "$$code-out-of-lambda-without-return";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
@@ -134,6 +136,8 @@ public class RunTime {
 		frag.add(DataS, "]");
 		frag.add(DLabel, ARRAY_SEPARATOR_SIGN_STRING);
 		frag.add(DataS, ", ");
+		frag.add(DLabel, LAMBDA_PRINT_STRING);
+		frag.add(DataS, "<lambda>");
 
 		return frag;
 	}
@@ -148,6 +152,7 @@ public class RunTime {
 		nullArrayIndexingError(frag);
 		arrayIndexOutOfBoundsError(frag);
 		arrayLengthNegativeError(frag);
+		lambdaWithoutReturnError(frag);
 
 		return frag;
 	}
@@ -434,6 +439,17 @@ public class RunTime {
 
 		frag.add(Label, NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR);
 		frag.add(PushD, arrayLengthNegativeMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	
+	private void lambdaWithoutReturnError(ASMCodeFragment frag) {
+		String codeOutOfLambdaWithoutReturnMessage = "$code-out-of-lambda-without-return";
+		
+		frag.add(DLabel, codeOutOfLambdaWithoutReturnMessage);
+		frag.add(DataS, "Reached end of function without return statement");
+		
+		frag.add(Label, NO_RETURN_IN_LAMBDA);
+		frag.add(PushD, codeOutOfLambdaWithoutReturnMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 

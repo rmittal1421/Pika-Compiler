@@ -4,7 +4,7 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.Labeller;
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.Record;
+import asmCodeGenerator.ASMConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType;
 import asmCodeGenerator.runtime.RunTime;
@@ -36,7 +36,7 @@ public class ArrayIndexingCodeGenerator implements SimpleCodeGenerator {
 		// Check if the index is beyond the array length
 		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_INDEX);
 		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);
-		Macros.readIOffset(frag, Record.ARRAY_LENGTH_OFFSET);
+		Macros.readIOffset(frag, ASMConstants.ARRAY_LENGTH_OFFSET);
 		frag.add(Subtract);
 		
 		Labeller labeller = new Labeller("array-indexing");
@@ -55,7 +55,7 @@ public class ArrayIndexingCodeGenerator implements SimpleCodeGenerator {
 		
 		// Base address where the first element is sitting
 		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);
-		frag.add(PushI, Record.ARRAY_HEADER_SIZE);
+		frag.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);
 		frag.add(Add);
 		
 		// Calculate how many bytes we need to move right form the just added address to get to the indexed element

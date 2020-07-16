@@ -1,5 +1,6 @@
 package symbolTable;
 
+import asmCodeGenerator.ASMConstants;
 import inputHandler.TextLocation;
 import lexicalAnalyzer.Lextant;
 import logging.PikaLogger;
@@ -51,7 +52,7 @@ public class Scope {
 		return new NegativeMemoryAllocator(
 				MemoryAccessMethod.INDIRECT_ACCESS_BASE,
 				MemoryLocation.FRAME_POINTER,
-				-8);
+				ASMConstants.FUNCTION_CALL_EXTRA_BYTES);
 	}
 	
 //////////////////////////////////////////////////////////////////////

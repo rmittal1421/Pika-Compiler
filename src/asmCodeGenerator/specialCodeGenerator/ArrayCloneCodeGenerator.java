@@ -4,7 +4,7 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.ASMCodeGenerator;
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.Record;
+import asmCodeGenerator.ASMConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType;
 import asmCodeGenerator.runtime.RunTime;
@@ -21,24 +21,24 @@ public class ArrayCloneCodeGenerator implements SimpleCodeGenerator {
 	}
 	
 	private void createCloneArrayRecord(ASMCodeFragment code) {
-		final int typecode = Record.ARRAY_TYPE_ID;
+		final int typecode = ASMConstants.ARRAY_TYPE_ID;
 		
 		code.add(Duplicate);
 		code.add(JumpFalse, RunTime.NULL_ARRAY_RUNTIME_ERROR);
 		
 		// Stack: [... toBeClonedArrayPointer]
 		code.add(Duplicate);                                        // [... toBeClonedArrayPointer toBeClonedArrayPointer]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);                  // [... toBeClonedArrayPointer toBeClonedArrayPointer headerSize]
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);                  // [... toBeClonedArrayPointer toBeClonedArrayPointer headerSize]
 		code.add(Add);                                              // [... toBeClonedArrayPointer baseAddressOfFirstElementOfOtherArray]
 		Macros.storeITo(code, RunTime.ARRAY_INDEXING_ARRAY);        // [... toBeClonedArrayPointer] & save the base of other array
 		code.add(Duplicate);                                        // [... toBeClonedArrayPointer toBeClonedArrayPointer]
-		Macros.readIOffset(code, Record.ARRAY_STATUS_FLAGS_OFFSET); // [... toBeClonedArrayPointer statusFlagOfOtherArray]
+		Macros.readIOffset(code, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET); // [... toBeClonedArrayPointer statusFlagOfOtherArray]
 		Macros.storeITo(code, RunTime.ARRAY_STATUS_FLAGS);    // [... toBeClonedArrayPointer]
 		code.add(Duplicate);                                        // [... toBeClonedArrayPointer toBeClonedArrayPointer]
-		Macros.readIOffset(code, Record.ARRAY_SUBTYPE_SIZE_OFFSET); // [... toBeClonedArrayPointer subtypeSizeOfToBeClonedArray]
+		Macros.readIOffset(code, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET); // [... toBeClonedArrayPointer subtypeSizeOfToBeClonedArray]
 		Macros.storeITo(code, RunTime.ARRAY_SUBTYPE_SIZE);    // [... toBeClonedArrayPointer]
 //		code.add(Duplicate);                                        // [... toBeClonedArrayPointer]
-		Macros.readIOffset(code, Record.ARRAY_LENGTH_OFFSET);       // [... lengthOfToBeClonedArray]
+		Macros.readIOffset(code, ASMConstants.ARRAY_LENGTH_OFFSET);       // [... lengthOfToBeClonedArray]
 		Macros.storeITo(code, RunTime.ARRAY_LENGTH);          // [...]
 		Macros.loadIFrom(code, RunTime.ARRAY_SUBTYPE_SIZE);   // [... subtypeSize]
 		Macros.loadIFrom(code, RunTime.ARRAY_LENGTH);         // [... subtypeSize length]
@@ -46,14 +46,14 @@ public class ArrayCloneCodeGenerator implements SimpleCodeGenerator {
 		code.add(Duplicate);                                        // [... numBytesToCopy numBytesToCopy]
 		Macros.storeITo(code, RunTime.ARRAY_DATASIZE_TEMPORARY);    // [... numBytesToCopy] & stored dataSize
 		code.add(Duplicate);                                        // [... numBytesToCopy numBytesToCopy]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);                  // [... numBytesToCopy numBytesToCopy headerSize]
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);                  // [... numBytesToCopy numBytesToCopy headerSize]
 		code.add(Add);                                              // [... numBytesToCopy totalRecordSize]
 		
 		// Need record size on top of stack which is the case
 		ASMCodeGenerator.createRecord(code, typecode, 0);    // This stores a pointer to an array in RECORD_CREATION_TEMPORARY
 		
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);  // [... numBytesToCopy thisArrayPointer]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);                  // [... numBytesToCopy thisArrayPointer headerSize]
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);                  // [... numBytesToCopy thisArrayPointer headerSize]
 		code.add(Add);                                              // [... numBytesToCopy addressForFirstElement]
 		code.add(Exchange);                                         // [... addressForFirstElement numBytesToCopy]
 		
@@ -64,11 +64,11 @@ public class ArrayCloneCodeGenerator implements SimpleCodeGenerator {
 		Macros.loadIFrom(code, RunTime.ARRAY_SUBTYPE_SIZE);
 		Macros.loadIFrom(code, RunTime.ARRAY_STATUS_FLAGS);
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIOffset(code, Record.ARRAY_STATUS_FLAGS_OFFSET);
+		Macros.writeIOffset(code, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIOffset(code, Record.ARRAY_SUBTYPE_SIZE_OFFSET);
+		Macros.writeIOffset(code, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIOffset(code, Record.ARRAY_LENGTH_OFFSET);
+		Macros.writeIOffset(code, ASMConstants.ARRAY_LENGTH_OFFSET);
 		
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 	}

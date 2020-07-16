@@ -2,6 +2,7 @@ package parseTree.nodeTypes;
 
 import java.util.ArrayList;
 
+import asmCodeGenerator.Labeller;
 import parseTree.ParseNode;
 import parseTree.ParseNodeVisitor;
 import semanticAnalyzer.types.Type;
@@ -10,13 +11,25 @@ import tokens.Token;
 
 public class LambdaNode extends ParseNode {
 	private int numberOfParameters = 0;
+	private String lambdaStartLabel;
+	private String lambdaEndLabel;
+	private String codeAfterReturnLabel;
 
 	public LambdaNode(Token token) {
 		super(token);
+		initializeLabels();
 	}
 
 	public LambdaNode(ParseNode node) {
 		super(node);
+		initializeLabels();
+	}
+	
+	private void initializeLabels() {
+		Labeller labeller = new Labeller("function-call");
+		this.lambdaStartLabel = labeller.newLabel("start");
+		this.lambdaEndLabel = labeller.newLabel("end");
+		this.codeAfterReturnLabel = labeller.newLabel("return-lambda");
 	}
 
 	public LextantToken lextantToken() {
@@ -29,6 +42,18 @@ public class LambdaNode extends ParseNode {
 	
 	public Type getReturnType() {
 		return this.child(this.numberOfParameters).getType();
+	}
+	
+	public String getStartLabel() {
+		return this.lambdaStartLabel;
+	}
+	
+	public String getEndLabel() {
+		return this.lambdaEndLabel;
+	}
+	
+	public String getReturnLabel() {
+		return this.codeAfterReturnLabel;
 	}
 
 ////////////////////////////////////////////////////////////

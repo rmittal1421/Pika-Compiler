@@ -11,30 +11,14 @@ import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
 import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
+import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
 import parseTree.*;
-import parseTree.nodeTypes.PopulatedArrayNode;
-import parseTree.nodeTypes.AssignmentStatementNode;
-import parseTree.nodeTypes.BinaryOperatorNode;
-import parseTree.nodeTypes.BooleanConstantNode;
-import parseTree.nodeTypes.CharacterConstantNode;
-import parseTree.nodeTypes.BlockStatementNode;
-import parseTree.nodeTypes.DeclarationNode;
-import parseTree.nodeTypes.FloatingConstantNode;
-import parseTree.nodeTypes.IdentifierNode;
-import parseTree.nodeTypes.IfStatementNode;
-import parseTree.nodeTypes.IntegerConstantNode;
-import parseTree.nodeTypes.NewlineNode;
-import parseTree.nodeTypes.PrintStatementNode;
-import parseTree.nodeTypes.ProgramNode;
-import parseTree.nodeTypes.SpaceNode;
-import parseTree.nodeTypes.StringConstantNode;
-import parseTree.nodeTypes.TabNode;
-import parseTree.nodeTypes.TypeNode;
-import parseTree.nodeTypes.UnaryOperatorNode;
-import parseTree.nodeTypes.WhileStatementNode;
+import parseTree.nodeTypes.*;
 import semanticAnalyzer.types.Array;
+import semanticAnalyzer.types.Lambda;
+import semanticAnalyzer.types.NullType;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import symbolTable.Binding;
@@ -61,13 +45,14 @@ public class ASMCodeGenerator {
 
 		// Code which should be in the pathway before actual application code
 		code.append(MemoryManager.codeForInitialization());
-		
+
 		code.append(RunTime.getEnvironment());
 		code.append(globalVariableBlockASM());
 		code.append(programASM());
-		
-		// Memory heap manger goes after the main program where main program is the programASM
-		code.append( MemoryManager.codeForAfterApplication() );
+
+		// Memory heap manger goes after the main program where main program is the
+		// programASM
+		code.append(MemoryManager.codeForAfterApplication());
 
 		return code;
 	}
@@ -98,96 +83,100 @@ public class ASMCodeGenerator {
 		root.accept(visitor);
 		return visitor.removeRootCode(root);
 	}
-	
+
 	public static void createRecord(ASMCodeFragment code, int typecode, int statusFlags) {
 		code.add(Call, MemoryManager.MEM_MANAGER_ALLOCATE);
 		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.RECORD_TYPEID_OFFSET, typecode);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.RECORD_STATUS_OFFSET, statusFlags);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.RECORD_TYPEID_OFFSET, typecode);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.RECORD_STATUS_OFFSET, statusFlags);
 	}
-	
+
 	// Stack: [... nElems]
 	public static void createEmptyArrayRecord(ASMCodeFragment code, int statusFlags, int subtypeSize) {
-		final int typecode = Record.ARRAY_TYPE_ID;
-		
+		final int typecode = ASMConstants.ARRAY_TYPE_ID;
+
 		// Give error if nElements < 0
-		code.add(Duplicate);           // [... nElems nElems]
-		code.add(JumpNeg, RunTime.NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR);   // [... nElems]
-		
+		code.add(Duplicate); // [... nElems nElems]
+		code.add(JumpNeg, RunTime.NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR); // [... nElems]
+
 		// Compute record size (Includes ASM header + aggregated size of elements)
-		code.add(Duplicate);           // [... nElems nElems]
-		code.add(PushI, subtypeSize);  // [... nElems nElems subtypeSize]
-		code.add(Multiply);            // [... nElems nElems*subtypeSize] === [... nElems elemsSize]
-		code.add(Duplicate);           // [... nElems elemsSize elemsSize]
-		Macros.storeITo(code, RunTime.ARRAY_DATASIZE_TEMPORARY);  // [... nElems elemsSize]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE); // [... nElems elemsSize headerSize]
-		code.add(Add);     // [... nElems recordSize]
-		
+		code.add(Duplicate); // [... nElems nElems]
+		code.add(PushI, subtypeSize); // [... nElems nElems subtypeSize]
+		code.add(Multiply); // [... nElems nElems*subtypeSize] === [... nElems elemsSize]
+		code.add(Duplicate); // [... nElems elemsSize elemsSize]
+		Macros.storeITo(code, RunTime.ARRAY_DATASIZE_TEMPORARY); // [... nElems elemsSize]
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... nElems elemsSize headerSize]
+		code.add(Add); // [... nElems recordSize]
+
 		// Call createRecord
-		createRecord(code, typecode, statusFlags);   // [... nElems]
-		
+		createRecord(code, typecode, statusFlags); // [... nElems]
+
 		// Zero out elements of array
-		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);  // [... nElems recordPointer]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);    // [... nElems recordPointer arrayHeaderSize]
-		code.add(Add);                                // [... nElems baseAddressToAddFirstElement]
-		Macros.loadIFrom(code, RunTime.ARRAY_DATASIZE_TEMPORARY);  // [... nElems baseAddressToAddFirstElement numBytes]
+		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY); // [... nElems recordPointer]
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... nElems recordPointer arrayHeaderSize]
+		code.add(Add); // [... nElems baseAddressToAddFirstElement]
+		Macros.loadIFrom(code, RunTime.ARRAY_DATASIZE_TEMPORARY); // [... nElems baseAddressToAddFirstElement numBytes]
 		code.add(Call, RunTime.CLEAR_N_BYTES);
-		
+
 		// Fill in array header
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_SUBTYPE_SIZE_OFFSET, subtypeSize);
-		Macros.writeIPtrOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_LENGTH_OFFSET);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET,
+				subtypeSize);
+		Macros.writeIPtrOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_LENGTH_OFFSET);
 	}
-	
+
 	// Stack: [... recordSize]
-	public static void createPopulatedArrayRecord(ASMCodeFragment code, int statusFlags, Type subtype, List<ASMCodeFragment> codeForChildren) {
+	public static void createPopulatedArrayRecord(ASMCodeFragment code, int statusFlags, Type subtype,
+			List<ASMCodeFragment> codeForChildren) {
 		assert codeForChildren.size() > 0;
-	
+
 		int subtypeSize = subtype.getSize();
-		final int typecode = Record.ARRAY_TYPE_ID;
-		
-		createRecord(code, typecode, statusFlags);                     // [...]
-		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);     // [... recordPointer]
-		
-		// We need to duplicate this since the recordPointer stored in RECORD_CREATION_TEMPORARY might be replaced by one of 
-		// children of this node as they can be an array too and they will use that runtime variable. Hence, later when we want
-		// to put that on stack, we will load the wrong one as it is replaced. So duplicate it, after adding all the children's code
+		final int typecode = ASMConstants.ARRAY_TYPE_ID;
+
+		createRecord(code, typecode, statusFlags); // [...]
+		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY); // [... recordPointer]
+
+		// We need to duplicate this since the recordPointer stored in
+		// RECORD_CREATION_TEMPORARY might be replaced by one of
+		// children of this node as they can be an array too and they will use that
+		// runtime variable. Hence, later when we want
+		// to put that on stack, we will load the wrong one as it is replaced. So
+		// duplicate it, after adding all the children's code
 		// storeItBack and then load later.
 		code.add(Duplicate);
-		
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);                     // [... recordPointer arrayHeaderSize]
-		code.add(Add);                                                 // [... baseAddressForFirstElement]
-		
+
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... recordPointer arrayHeaderSize]
+		code.add(Add); // [... baseAddressForFirstElement]
+
 //		ASMCodeFragment opcodeForStore = opcodeForStore(subtype);
-		
-		for(ASMCodeFragment cCode: codeForChildren) {                  // [... baseAddressforNthElement]
-			code.add(Duplicate);                                       // [... baseAddressForNthElement baseAddressForNthElement]
-			code.append(cCode);                                        // [... baseAddressForNthElement baseAddressForNthElement cCode]
-			code.append(opcodeForStore(subtype));                               // [... baseAddressForNthElement]
+
+		for (ASMCodeFragment cCode : codeForChildren) { // [... baseAddressforNthElement]
+			code.add(Duplicate); // [... baseAddressForNthElement baseAddressForNthElement]
+			code.append(cCode); // [... baseAddressForNthElement baseAddressForNthElement cCode]
+			code.append(opcodeForStore(subtype)); // [... baseAddressForNthElement]
 //			code.add(StoreI);
-			code.add(PushI, subtypeSize);                              // [... baseAddressForNthElement subtypeSize]
-			code.add(Add);                                             // [... baseAddressFor(N+1)thElement]
+			code.add(PushI, subtypeSize); // [... baseAddressForNthElement subtypeSize]
+			code.add(Add); // [... baseAddressFor(N+1)thElement]
 		}
-		code.add(Pop);                                                 // [... baseAddressForFirstElement]
-		
+		code.add(Pop); // [... baseAddressForFirstElement]
+
 		// Fill in array header
 		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_SUBTYPE_SIZE_OFFSET, subtypeSize);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, Record.ARRAY_LENGTH_OFFSET, codeForChildren.size());
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET,
+				subtypeSize);
+		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_LENGTH_OFFSET,
+				codeForChildren.size());
 	}
-	
+
 	// Spits out fragment for storing a value
 	public static ASMCodeFragment opcodeForStore(Type type) {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING || type instanceof Array) {
+		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array || type instanceof Lambda) {
 			frag.add(StoreI);
-		}
-		else if (type == PrimitiveType.FLOATING) {
+		} else if (type == PrimitiveType.FLOATING) {
 			frag.add(StoreF);
-		}
-		else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
+		} else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
 			frag.add(StoreC);
-		}
-		else if (type == PrimitiveType.RATIONAL) {
+		} else if (type == PrimitiveType.RATIONAL) {
 			// Stack is: [.. pointerToStoreIn num den]
 			Macros.storeITo(frag, RunTime.RATIONAL_DEN);
 			Macros.storeITo(frag, RunTime.RATIONAL_NUM);
@@ -203,16 +192,16 @@ public class ASMCodeGenerator {
 		}
 		return frag;
 	}
-	
+
 	public static ASMCodeFragment opcodeForLoad(Type type) {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array) {
+		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array || type instanceof Lambda) {
 			frag.add(LoadI);
 		} else if (type == PrimitiveType.FLOATING) {
 			frag.add(LoadF);
 		} else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
 			frag.add(LoadC);
-		} else if(type == PrimitiveType.RATIONAL) {
+		} else if (type == PrimitiveType.RATIONAL) {
 			// Stack : [... addressOfRationalNumber]
 			frag.add(Duplicate);
 			frag.add(PushI, 4);
@@ -293,13 +282,14 @@ public class ASMCodeGenerator {
 		}
 
 		private void turnAddressIntoValue(ASMCodeFragment code, ParseNode node) {
-			if (node.getType() == PrimitiveType.INTEGER || node.getType() == PrimitiveType.STRING || node.getType() instanceof Array) {
+			if (node.getType() == PrimitiveType.INTEGER || node.getType() == PrimitiveType.STRING
+					|| node.getType() instanceof Array || node.getType() instanceof Lambda) {
 				code.add(LoadI);
 			} else if (node.getType() == PrimitiveType.FLOATING) {
 				code.add(LoadF);
 			} else if (node.getType() == PrimitiveType.BOOLEAN || node.getType() == PrimitiveType.CHARACTER) {
 				code.add(LoadC);
-			} else if(node.getType() == PrimitiveType.RATIONAL) {
+			} else if (node.getType() == PrimitiveType.RATIONAL) {
 				// Stack : [... addressOfRationalNumber]
 				code.add(Duplicate);
 				code.add(PushI, 4);
@@ -312,6 +302,32 @@ public class ASMCodeGenerator {
 				assert false : "node " + node;
 			}
 			code.markAsValue();
+		}
+		
+		private ASMCodeFragment opcodeForStore(Type type) {
+			ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
+			if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array
+					|| type instanceof Lambda) {
+				frag.add(StoreI);
+			} else if (type == PrimitiveType.FLOATING) {
+				frag.add(StoreF);
+			} else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
+				frag.add(StoreC);
+			} else if (type == PrimitiveType.RATIONAL) {
+				// Stack is: [.. pointerToStoreIn num den]
+				Macros.storeITo(frag, RunTime.RATIONAL_DEN);
+				Macros.storeITo(frag, RunTime.RATIONAL_NUM);
+				frag.add(Duplicate);
+				frag.add(PushI, 4);
+				frag.add(Add);
+				Macros.loadIFrom(frag, RunTime.RATIONAL_DEN);
+				frag.add(StoreI);
+				Macros.loadIFrom(frag, RunTime.RATIONAL_NUM);
+				frag.add(StoreI);
+			} else {
+				assert false : "Type " + type + " unimplemented in opcodeForStore()";
+			}
+			return frag;
 		}
 
 		////////////////////////////////////////////////////////////////////
@@ -357,11 +373,170 @@ public class ASMCodeGenerator {
 			code.add(PushD, RunTime.SPACE_PRINT_FORMAT);
 			code.add(Printf);
 		}
-		
+
 		public void visit(TabNode node) {
 			newVoidCode(node);
 			code.add(PushD, RunTime.TAB_PRINT_FORMAT);
 			code.add(Printf);
+		}
+
+		public void visitLeave(LambdaNode node) {
+			newValueCode(node);
+			
+			String startLabel = node.getStartLabel();
+			String endLabel = node.getEndLabel();
+			String returnLabel = node.getReturnLabel();
+			
+			/*
+			 * Taking the approach of directly jumping over function code without letting anyone who has not called function run the code
+			 */
+			code.add(Jump, endLabel);
+			
+			code.add(Label, startLabel);
+			
+			/*
+			 * Stack while starting the function call: [... returnAddress]
+			 * 
+			 * Steps to follow:
+			 * 1. Store information of old frame pointer and return address in memory
+			 * 2. Set frame pointer to be equal to stack pointer (Make sure stack pointer location is not changed as it was before function call)
+			 * 3. Subtract the size of lambda's body from stack pointer (which includes the additional bytes added above)
+			 * 4. Merge the code of the body of this lambda and hence, it will run (scoping has been taken care of)
+			 * 5. Within the body, if the code reaches return statement, the visitLeave for returnNode sends it to returnLabel.
+			 * 	  Otherwise, runtime error
+			 * 6. At returnLabel, the return value must be at top of stack
+			 * 		- Push the return address from memory (FramePointer - 8) on top of stack
+			 * 		- Update frame pointer with the address stored at FramePointer - 4
+			 * 		- Push exchange instruction which brings returned value on top of stack
+			 * 		- Increase stack pointer to it's old value by adding (sizeOfFuncFrame + Additional bytes required)
+			 * 		- Decrease the stack pointer by size of returned value and place the top of stack's value at SP.
+			 * 7. After this, we should have return address on top of stack where we want to go back from where the function was called. (Push Return).
+			 */
+			
+			// Step 1.
+			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... returnAddress SP]
+			code.add(Duplicate);                                                              // [... returnAddress SP SP]
+			code.add(PushI, ASMConstants.FRAME_POINTER_SIZE);                                 // [... returnAddress SP SP 4]
+			code.add(Subtract);                                                               // [... returnAddress SP SP-4]
+			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                    // [... returnAddress SP SP-4 FP]
+			code.add(StoreI);                                                                 // [... returnAddress SP]
+			code.add(PushI, ASMConstants.FUNCTION_CALL_EXTRA_BYTES);                          // [... returnAddress SP 8]
+			code.add(Subtract);                                                               // [... returnAddress SP-8]
+			code.add(Exchange);                                                               // [... SP-8 returnAddress]
+			code.add(StoreI);                                                                 // [...] and old FP and returnAddress are in memory now
+			
+			// Step 2.
+			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... SP]
+			Macros.storeITo(code, RunTime.FRAME_POINTER);                                     // [...] and now FP == SP
+			
+			// Step 3.
+			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... SP]
+			int functionOverallSize = ASMConstants.FUNCTION_CALL_EXTRA_BYTES + node.child(node.nChildren() - 1).getScope().getAllocatedSize();
+			code.add(PushI, functionOverallSize);                                             // [... SP sizeOfFunctionCall]
+			code.add(Subtract);                                                               // [... newSP]
+			Macros.storeITo(code, RunTime.STACK_POINTER);                                     // [...]
+			
+			// Step 4.
+			code.append(removeVoidCode(node.child(node.nChildren() - 1)));
+			
+			// Step 5.
+			// RunTime error if comes here (which means that code took a path which was not followed by a return statement in the body)
+			code.add(Jump, RunTime.NO_RETURN_IN_LAMBDA);
+			
+			// Code should reach here if there was a valid return statement
+			code.add(Label, returnLabel);
+			
+			// Step 6.                                                                         // [... returnedValue]
+			// 6.1
+			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                     // [... returnedValue FP]
+			code.add(Duplicate);                                                               // [... returnedValue FP FP]
+			code.add(PushI, ASMConstants.FUNCTION_CALL_EXTRA_BYTES);                           // [... returnedValue FP FP 8]
+			code.add(Subtract);                                                                // [... returnedValue FP FP-8]
+			code.add(LoadI);                                                                   // [... returnedValue FP whereToReturnAddr]
+			code.add(Exchange);                                                                // [... returnedValue whereToReturnAddr FP]
+			
+			// 6.2
+			code.add(PushI, ASMConstants.FRAME_POINTER_SIZE);                                  // [... returnedValue whereToReturnAddr FP 4]
+			code.add(Subtract);                                                                // [... returnedValue whereToReturnAddr FP-4]
+			code.add(LoadI);                                                                   // [... returnedValue whereToReturnAddr oldFramePointer]
+			Macros.storeITo(code, RunTime.FRAME_POINTER);                                      // [... returnedValue whereToReturnAddr]
+			
+			// 6.3
+			flipValueAndAddress(node.getReturnType());                                         // [... whereToReturnAddr returnedValue]
+			
+			// 6.4
+			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                     // [... whereToReturnAddr returnedValue SP]
+			
+			int parameterScopeSize = node.getScope().getAllocatedSize();
+			code.add(PushI, functionOverallSize + parameterScopeSize);                         // [... whereToReturnAddr returnedValue SP funcSize+paramScopeSize]
+			code.add(Add);                                                                     // [... whereToReturnAddr returnedValue SP+sizeToUpgrade]
+			code.add(Duplicate);                                                               // [... whereToReturnAddr returnedValue newSP newSP]
+			Macros.storeITo(code, RunTime.STACK_POINTER);                                      // [... whereToReturnAddr returnedValue newSP]
+			
+			// 6.5
+			code.add(PushI, node.getReturnType().getSize());                                   // [... whereToReturnAddr returnedValue newSP returnTypeSize]
+			code.add(Subtract);                                                                // [... whereToReturnAddr returnedValue newSP-returnTypeSize]
+			placeReturnedValue(node.getReturnType());
+			
+			// Step 7
+			code.add(Return);                                                                  // [... whereToReturnAddr] -> [...]
+			
+			// ------------ End of function --------------
+			
+			// Code should come directly here if function's code was not called
+			code.add(Label, endLabel);
+			
+			// Marking the location of the code for the function
+			code.add(PushD, startLabel);
+		}
+		
+		private void flipValueAndAddress(Type returnType) {
+			/*
+			 * This assumes you have a situation like this:
+			 * Stack : [... value address] and you want to switch them
+			 * 
+			 * Two cases:
+			 * If rational, exchange twice
+			 * Else, exchange once
+			 */
+			
+			if(!(returnType instanceof NullType)) {
+				code.add(Exchange);                                                            // [... address value]
+			}
+			
+			// If returnType was rational, stack must be like this: [... numerator address denominator]
+			if(returnType == PrimitiveType.RATIONAL) {
+				Macros.storeITo(code, RunTime.RATIONAL_DEN);                                   // [... numerator address]
+				code.add(Exchange);                                                            // [... address numerator]
+				Macros.loadIFrom(code, RunTime.RATIONAL_DEN);                                  // [... address value]
+			}
+		}
+		
+		private void placeReturnedValue(Type returnType) {
+			// Stack: [... whereToReturnAddr returnedValue newSP-returnTypeSize]
+			if(returnType instanceof NullType) {
+				code.add(Pop);                                                                 // [... whereToReturnAddr] (Should be no returned value in null case)
+			} else {
+				// Stack should be : [... whereToReturnAddress value SP]
+				flipValueAndAddress(returnType);                                               // [... whereToReturnAddr SP value]
+				code.append(opcodeForStore(returnType));                                       // [... whereToReturnAddr]
+			}
+		}
+
+		public void visitLeave(ParameterSpecificationNode node) {
+			newVoidCode(node);
+		}
+
+		public void visitLeave(FunctionNode node) {
+			newVoidCode(node);
+			ASMCodeFragment lvalue = removeAddressCode(node.child(0));
+			ASMCodeFragment rvalue = removeValueCode(node.child(1));
+
+			code.append(lvalue);
+			code.append(rvalue);
+
+			Type type = node.getType();
+			code.append(opcodeForStore(type));
 		}
 
 		public void visitLeave(DeclarationNode node) {
@@ -375,111 +550,129 @@ public class ASMCodeGenerator {
 			Type type = node.getType();
 			code.append(opcodeForStore(type));
 		}
-		
+
 		public void visitLeave(AssignmentStatementNode node) {
 			newVoidCode(node);
 			ASMCodeFragment lvalue = removeAddressCode(node.child(0));
 			ASMCodeFragment rvalue = removeValueCode(node.child(1));
-			
+
 			code.append(lvalue);
 			code.append(rvalue);
-			
+
 			Type type = node.getType();
 			code.append(opcodeForStore(type));
 		}
-		
+
 		public void visitLeave(TypeNode node) {
 			newValueCode(node);
 		}
-		
+
 		public void visitLeave(IfStatementNode node) {
 			Labeller labeller = new Labeller("if");
 			String falseLabel = labeller.newLabel("false");
 			String endLabel = labeller.newLabel("end");
-			
+
 			newVoidCode(node);
-			
+
 			ASMCodeFragment condition = removeValueCode(node.child(0));
 			ASMCodeFragment thenClause = removeVoidCode(node.child(1));
-			
+
 			code.append(condition);
 			code.add(JumpFalse, falseLabel);
 			code.append(thenClause);
 			code.add(Jump, endLabel);
-			
+
 			code.add(Label, falseLabel);
-			
-			if(hasElseClause(node)) {
+
+			if (hasElseClause(node)) {
 				ASMCodeFragment elseClause = removeVoidCode(node.child(2));
 				code.append(elseClause);
 			}
-			
+
 			code.add(Label, endLabel);
 		}
+
 		private boolean hasElseClause(IfStatementNode node) {
 			return node.nChildren() == 3;
 		}
-		
+
 		public void visitLeave(WhileStatementNode node) {
-			Labeller labeller = new Labeller("while");
-			String startLabel = labeller.newLabel("start");
-			String falseAndEndLabel = labeller.newLabel("falseAndEnd");
-			
+			String startLabel = node.getStartLabel();
+			String falseAndEndLabel = node.getEndLabel();
+
 			newVoidCode(node);
-			
+
 			ASMCodeFragment condition = removeValueCode(node.child(0));
 			ASMCodeFragment whileBlock = removeVoidCode(node.child(1));
-			
+
 			code.add(Label, startLabel);
 			code.append(condition);
 			code.add(JumpFalse, falseAndEndLabel);
 			code.append(whileBlock);
 			code.add(Jump, startLabel);
-			
+
 			code.add(Label, falseAndEndLabel);
 		}
+		
+		public void visit(BreakNode node) {
+			newVoidCode(node);
+			
+			code.add(Jump, node.getEnclosingWhileEndLabel());
+		}
+		
+		public void visit(ContinueNode node) {
+			newVoidCode(node);
+			
+			code.add(Jump, node.getEnclosingWhileStartLabel());
+		}
+		
+		public void visitLeave(ReturnNode node) {
+			newVoidCode(node);
+			
+			if(node.nChildren() > 0) {
+				code.append(removeValueCode(node.child(0)));
+			}
+			
+			code.add(Jump, node.whereToGoOnReturn());
+		}
+		
+		private void handleFunctionInvocationForCall(UnaryOperatorNode node) {
+			ASMCodeFragment inCaseNotNull = new ASMCodeFragment(GENERATES_VOID);
+			Type childType = node.child(0).getType();
 
-		private ASMCodeFragment opcodeForStore(Type type) {
-			ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-			if (type == PrimitiveType.INTEGER  || type == PrimitiveType.STRING || type instanceof Array) {
-				frag.add(StoreI);
+			if (!(childType instanceof NullType)) {
+				// We will need to remove the appended values!!
+				inCaseNotNull.add(Pop);
+				if (node.getType() == PrimitiveType.RATIONAL) {
+					inCaseNotNull.add(Pop);
+				}
 			}
-			else if (type == PrimitiveType.FLOATING) {
-				frag.add(StoreF);
-			}
-			else if (type == PrimitiveType.BOOLEAN || type == PrimitiveType.CHARACTER) {
-				frag.add(StoreC);
-			}
-			else if (type == PrimitiveType.RATIONAL) {
-				// Stack is: [.. pointerToStoreIn num den]
-				Macros.storeITo(frag, RunTime.RATIONAL_DEN);
-				Macros.storeITo(frag, RunTime.RATIONAL_NUM);
-				frag.add(Duplicate);
-				frag.add(PushI, 4);
-				frag.add(Add);
-				Macros.loadIFrom(frag, RunTime.RATIONAL_DEN);
-				frag.add(StoreI);
-				Macros.loadIFrom(frag, RunTime.RATIONAL_NUM);
-				frag.add(StoreI);
-			} else {
-				assert false : "Type " + type + " unimplemented in opcodeForStore()";
-			}
-			return frag;
+
+			newVoidCode(node);
+			code.append((childType instanceof NullType) ? removeVoidCode(node.child(0)) : removeValueCode(node.child(0)));
+			
+			// TODO: Check if this is working fine in case of no instruction added in inCaseNotNull
+			code.append(inCaseNotNull);
 		}
 
 		///////////////////////////////////////////////////////////////////////////
 		// expressions
 		public void visitLeave(UnaryOperatorNode node) {
+			if (node.getToken().isLextant(Keyword.CALL)) {
+				handleFunctionInvocationForCall(node);
+				return;
+			}
+
 			newValueCode(node);
-			
+
 			ASMCodeFragment arg = removeValueCode(node.child(0));
 			code.append(arg);
-			
+
 			Object variant = node.getSignature().getVariant();
 			if (variant instanceof ASMOpcode) {
 				ASMOpcode opcode = (ASMOpcode) variant;
 				code.add(opcode);
-			} else if(variant instanceof SimpleCodeGenerator) {
+			} else if (variant instanceof SimpleCodeGenerator) {
 				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node);
 				code.append(fragment);
@@ -487,13 +680,59 @@ public class ASMCodeGenerator {
 				if (fragment.isAddress()) {
 					// Which means that the fragment returns a pointer
 					code.markAsAddress(); // Now we know that this code is a pointer
-				} else if(fragment.isVoid()) {
+				} else if (fragment.isVoid()) {
 					code.markAsVoid();
 				}
 
 			}
 		}
-		
+
+		public void visitLeave(KNaryOperatorNode node) {
+			// Handle visit for function call here (Since it is the only use of
+			// KNaryOperatorNode for now)
+			assert node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION);
+			
+			if(node.getType() instanceof NullType) {
+				newVoidCode(node);
+			} else {
+				newValueCode(node);
+			}
+
+			/*
+			 * To handle function calls, First, store all the parameter values on the memory
+			 * stack using stack pointer (if any)
+			 */
+
+			Macros.loadIFrom(code, RunTime.STACK_POINTER);                    // [... SP]
+			
+			for (int i = 1; i < node.nChildren(); i++) {
+				code.add(PushI, node.child(i).getType().getSize());           // [... SP sizeOfType]
+				code.add(Subtract);                                           // [... SP-sizeOfType] which is the location where will store our parameter
+				code.add(Duplicate);                                          // [... nSP nSP]
+				code.append(removeValueCode(node.child(i)));                  // [... nSP nSP pValue]
+				code.append(opcodeForStore(node.child(i).getType()));         // [... nSP]
+			}
+			
+			Macros.storeITo(code, RunTime.STACK_POINTER);                     // [...]
+			
+			// Call the function using address from first child!
+			code.append(removeValueCode(node.child(0)));                      // [... lambdaAddress]
+			code.add(CallV);                                                  // Jumps to lambdaAddress and stack becomes [... returnAddr]
+			
+			// After completing the function call, the code comes here with stack:
+			// [...] and with the value returned from function (if any) at stack pointer location
+			
+			Type returnType = node.getType();
+			int sizeOfReturnValue = returnType.getSize();
+			if(sizeOfReturnValue > 0) {
+				// We need the value
+				Macros.loadIFrom(code, RunTime.STACK_POINTER);                // [... SP] 
+				code.add(PushI, sizeOfReturnValue);                           // [... SP returnValueSize]
+				code.add(Subtract);                                           // [... SP-returnValueSize(newSP)]
+				code.append(opcodeForLoad(returnType));                       // [... valueReturnedFromFunctionCall]
+			}
+		}
+
 		public void visitLeave(BinaryOperatorNode node) {
 			Lextant operator = node.getOperator();
 
@@ -530,21 +769,22 @@ public class ASMCodeGenerator {
 			assert (operator instanceof Punctuator);
 
 			Punctuator punctuator = (Punctuator) operator;
-			
+
 			boolean isFloating = type == PrimitiveType.FLOATING;
-			
-			if(type == PrimitiveType.RATIONAL) {
-				// Stack currently has: [num1 den1 num2 den2] and I want [num1*den2 num2*den1] for comparisons
-				Macros.storeITo(code, RunTime.RATIONAL_DEN);      // [num1 den1 num2]
-				code.add(Multiply);                               // [num1 den1*num2]
-				code.add(Exchange);                               // [den1*num2 num1]
-				Macros.loadIFrom(code, RunTime.RATIONAL_DEN);     // [den1*num2 num1 den2]
-				code.add(Multiply);                               // [den1*num2 num1*den2]
-				code.add(Exchange);                               // [num1*den2 den1*num2]
+
+			if (type == PrimitiveType.RATIONAL) {
+				// Stack currently has: [num1 den1 num2 den2] and I want [num1*den2 num2*den1]
+				// for comparisons
+				Macros.storeITo(code, RunTime.RATIONAL_DEN); // [num1 den1 num2]
+				code.add(Multiply); // [num1 den1*num2]
+				code.add(Exchange); // [den1*num2 num1]
+				Macros.loadIFrom(code, RunTime.RATIONAL_DEN); // [den1*num2 num1 den2]
+				code.add(Multiply); // [den1*num2 num1*den2]
+				code.add(Exchange); // [num1*den2 den1*num2]
 			}
 
 			code.add(isFloating ? FSubtract : Subtract);
-			
+
 			// Change the type checker to something better
 			switch (punctuator) {
 			case GREATER:
@@ -588,18 +828,18 @@ public class ASMCodeGenerator {
 			newValueCode(node);
 			ASMCodeFragment arg1 = removeValueCode(node.child(0));
 			ASMCodeFragment arg2 = removeValueCode(node.child(1));
-			
+
 			Object variant = node.getSignature().getVariant();
 			if (variant instanceof ASMOpcode) {
 				code.append(arg1);
 				code.append(arg2);
-				
+
 				ASMOpcode opcode = (ASMOpcode) variant;
 				code.add(opcode);
 			} else if (variant instanceof SimpleCodeGenerator) {
 				code.append(arg1);
 				code.append(arg2);
-				
+
 				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node);
 				code.append(fragment);
@@ -611,10 +851,10 @@ public class ASMCodeGenerator {
 			} else if (variant instanceof FullCodeGenerator) {
 				FullCodeGenerator generator = (FullCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node, arg1, arg2);
-				
+
 				code.append(fragment);
-				
-				if(fragment.isAddress()) {
+
+				if (fragment.isAddress()) {
 					code.markAsAddress();
 				}
 			} else {
@@ -668,31 +908,33 @@ public class ASMCodeGenerator {
 
 			code.add(PushI, node.getValue());
 		}
+
 		public void visit(StringConstantNode node) {
 			newValueCode(node);
-			
+
 			Labeller labeller = new Labeller("string-constant");
 			String thisStringLabel = labeller.newLabel("");
-			
+
 			code.add(DLabel, thisStringLabel);
 			code.add(DataS, node.getValue());
 			code.add(PushD, thisStringLabel);
 		}
-		
+
 		public void visitLeave(PopulatedArrayNode node) {
 			newValueCode(node);
-			
-			Type subtype = ((Array)node.getType()).getSubtype();
-			int statusFlags = subtype instanceof Array ? Record.STATUS_FLAG_FOR_REFERENCE : Record.STATUS_FLAG_FOR_NON_REFERENCE;
+
+			Type subtype = ((Array) node.getType()).getSubtype();
+			int statusFlags = subtype instanceof Array ? ASMConstants.STATUS_FLAG_FOR_REFERENCE
+					: ASMConstants.STATUS_FLAG_FOR_NON_REFERENCE;
 			int nElems = node.nChildren();
 			ArrayList<ASMCodeFragment> codeForChildren = new ArrayList<>(nElems);
-			for(ParseNode cNode: node.getChildren()) {
+			for (ParseNode cNode : node.getChildren()) {
 				codeForChildren.add(removeValueCode(cNode));
 			}
-			int recordSize = Record.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
+			int recordSize = ASMConstants.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
 			code.add(PushI, recordSize); // [... recordSize] before calling to create a record
 			createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
-			
+
 			// Place the created record's address on the stack
 			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 		}

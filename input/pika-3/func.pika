@@ -1,26 +1,64 @@
 func foo<int c, int d> -> null {
-	var c := 2.
-	print 1 + 2.
-	
-	var r := 2.4.
-	print r + c.
-	
-	#r := zoo.
+	print c; d; _n_.
+	return.
 }
 
-func boo<> -> int {
-	print 1 + 2.
+func boo<> -> rat {
+	var a := 1 + 2.
+	
+	if(a == 3) {
+		return a//5.
+	} else {
+		return 0//5.
+	}
+}
+
+func rec<int a> -> null {
+	if(a == 0) {
+		print _n_.
+		return.
+	}
+	
+	print a;.
+	call rec(a - 1).
+	return.
+}
+
+func fin<int a, int b> -> int {
+	return pax(5*a, b).
+}
+
+func pax<int a, int b> -> int {
+	if(a < b) {
+		return a.
+	}
+	
+	return b + pax(a, 3*b).
 }
 
 exec {
-	var a := 1.
+	#var a := 1.
 	call foo(1, 2).
+	call rec(10).
 	
-	var b := boo().
-	{
-		var a := 2.
-		print a, _n_.
-	}
+	print boo(); _n_.
 	
-	print a.
+	call rec(10).
+	#const a := 11.
+	#const b := 14.
+	#const c := 16.
+	
+	#print pax(a, b), _n_, _n_.
+	#print fin(a, b).
+	
+	#const a := 1.
+	#const b := <> -> int {
+	#	return a.
+	#}.
+	#print b.
 }
+
+
+
+
+

@@ -22,7 +22,10 @@ public enum Keyword implements Lextant {
 	LENGTH("length"),
 	DEALLOC("dealloc"),
 	FUNC("func"),
-	CALL("call"),
+	CALL("call"), 
+	RETURN("return"),
+	BREAK("break"),
+	CONTINUE("continue"),
 	
 	// Types
 	BOOL("bool"),

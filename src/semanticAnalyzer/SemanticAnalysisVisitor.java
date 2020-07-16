@@ -36,33 +36,38 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		enterProgramScope(node);
 		performFirstVisit(node);
 	}
-	
+
+	private Lambda fetchLambdaSignature(LambdaNode node) {
+		// Fetch the signature of lambda
+		List<Type> paramTypes = new ArrayList<>();
+		Type returnType = PrimitiveType.ERROR;
+
+		for (ParseNode lChild : node.getChildren()) {
+			if (lChild instanceof ParameterSpecificationNode) {
+				lChild.child(0).accept(this);
+				paramTypes.add(lChild.child(0).getType());
+			} else if (lChild instanceof TypeNode) {
+				lChild.accept(this);
+				returnType = lChild.getType();
+			}
+		}
+
+		Lambda functionLambdaType = new Lambda(paramTypes, returnType);
+		return functionLambdaType;
+	}
+
 	private void performFirstVisit(ProgramNode node) {
-		for(ParseNode child: node.getChildren()) {
-			if(child instanceof FunctionNode) {
+		for (ParseNode child : node.getChildren()) {
+			if (child instanceof FunctionNode) {
 				assert child.nChildren() == 2;
-				
+
 				// Fetch the identifier
-				IdentifierNode identifierNode = (IdentifierNode)child.child(0);
-				
-				// Fetch the signature of lambda
-				List<Type> paramTypes = new ArrayList<>();
-				Type returnType = PrimitiveType.ERROR;
-				
-				for(ParseNode lChild: child.child(1).getChildren()) {
-					if(lChild instanceof ParameterSpecificationNode) {
-						lChild.accept(this);
-						paramTypes.add(lChild.getType());
-					} else if(lChild instanceof TypeNode) {
-						lChild.accept(this);
-						returnType = lChild.getType();
-					}
-				}
-				
-				Type functionLambdaType = new Lambda(paramTypes, returnType);
+				IdentifierNode identifierNode = (IdentifierNode) child.child(0);
+
+				Type functionLambdaType = fetchLambdaSignature((LambdaNode) child.child(1));
 				child.setType(functionLambdaType);
 				child.child(1).setType(functionLambdaType);
-				
+
 				addBinding(identifierNode, functionLambdaType, ((FunctionNode) child).getDeclarationType());
 			}
 		}
@@ -73,11 +78,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	}
 
 	public void visitEnter(BlockStatementNode node) {
-		if(node.getParent() instanceof LambdaNode) {
+		if (node.getParent() instanceof LambdaNode) {
 			enterProcedureScope(node);
 			return;
 		}
-		
+
 		enterSubscope(node);
 	}
 
@@ -91,13 +96,14 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Scope scope = Scope.createProgramScope();
 		node.setScope(scope);
 	}
-	
+
 	private void enterParameterScope(ParseNode node) {
-		Scope baseScope = node.getLocalScope();
+		Scope baseScope = node.getBaseScope();
+//		Scope baseScope = node.getLocalScope();
 		Scope scope = baseScope.createParameterScope();
 		node.setScope(scope);
 	}
-	
+
 	private void enterProcedureScope(ParseNode node) {
 		Scope baseScope = node.getLocalScope();
 		Scope scope = baseScope.createProcedureScope();
@@ -113,38 +119,80 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	private void leaveScope(ParseNode node) {
 		node.getScope().leave();
 	}
-	
+
 	///////////////////////////////////////////////////////////////////////////
 	// function handlers
 	@Override
 	public void visitEnter(FunctionNode node) {
 	}
-	
+
 	@Override
 	public void visitLeave(FunctionNode node) {
 	}
-	
+
 	@Override
 	public void visitEnter(LambdaNode node) {
 		enterParameterScope(node);
+
+		// If lambdaNode is not immediate child of functionNode, it has been declared
+		// within some local scope which is not global.
+		// Hence, fetch it's type
+		if (!(node.getParent() instanceof FunctionNode)) {
+			// TODO: Check if it is assigned to const
+			Lambda lambdaType = fetchLambdaSignature(node);
+			node.setType(lambdaType);
+
+		}
 	}
-	
+
 	@Override
 	public void visitLeave(LambdaNode node) {
 		leaveScope(node);
 	}
-	
+
 	@Override
 	public void visitEnter(ParameterSpecificationNode node) {
 	}
-	
+
 	@Override
 	public void visitLeave(ParameterSpecificationNode node) {
 		Type paramType = node.child(0).getType();
+		
+		//TODO: To be sure, add a safety check here that node.child(1) is identifier type
 		IdentifierNode identifierNode = (IdentifierNode) node.child(1);
 		identifierNode.setType(paramType);
 		node.setType(paramType);
 		addBinding(identifierNode, paramType, node.getDeclarationType());
+	}
+
+	@Override
+	public void visitLeave(ReturnNode node) {
+		// Find if there is a enclosing lambda; if found, check return type, otherwise
+		// wrong usage of return statement.
+		for (ParseNode immParent : node.pathToRoot()) {
+			Type parentType = immParent.getType();
+
+			if (parentType instanceof Lambda) {
+				/*
+				 * Found the enclosing parent which is lambda Compare return types. If return
+				 * type of lambda is null, there should be no child.
+				 */
+				Lambda lambdaTypeOfParent = (Lambda) parentType;
+				if ((node.nChildren() == 1 && lambdaTypeOfParent.getReturnType().equivalent(node.child(0).getType()))
+						|| (node.nChildren() == 0 && lambdaTypeOfParent.getReturnType() instanceof NullType)) {
+					node.setType(lambdaTypeOfParent.getReturnType());
+					node.setWhereToGoOnReturn(((LambdaNode) immParent).getReturnLabel());
+				} else {
+					IllegalReturnType(node);
+					node.setType(PrimitiveType.ERROR);
+				}
+
+				return;
+			}
+		}
+
+		returnStatementNotInFunction(node);
+		node.setType(PrimitiveType.ERROR);
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -169,12 +217,13 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(AssignmentStatementNode node) {
 		ParseNode target = node.child(0);
 		ParseNode expression = node.child(1);
-		
+
 		ArrayList<Type> castFromTypes = new ArrayList<>(Arrays.asList(PrimitiveType.CHARACTER, PrimitiveType.INTEGER));
-		ArrayList<Type> castToTypes = new ArrayList<>(Arrays.asList(PrimitiveType.INTEGER, PrimitiveType.FLOATING, PrimitiveType.RATIONAL));
-		
-		if(!target.getType().equivalent(expression.getType())) {
-			if(castFromTypes.contains(expression.getType()) && castToTypes.contains(target.getType())) {
+		ArrayList<Type> castToTypes = new ArrayList<>(
+				Arrays.asList(PrimitiveType.INTEGER, PrimitiveType.FLOATING, PrimitiveType.RATIONAL));
+
+		if (!target.getType().equivalent(expression.getType())) {
+			if (castFromTypes.contains(expression.getType()) && castToTypes.contains(target.getType())) {
 				promoteNode(node, target.getType(), 1);
 			} else {
 				typeCheckError(node, Arrays.asList(target.getType(), expression.getType()));
@@ -195,14 +244,22 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 	@Override
 	public void visitLeave(TypeNode node) {
-		if(!node.getToken().isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
-			if(node.getToken().isLextant(Keyword.NULL)) {
+		if (node.getToken().isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
+			node.setType(new Array(node.child(0).getType()));
+		} else if(node.getToken().isLextant(Punctuator.LESS)) {
+			// Lambda Type
+			ArrayList<Type> paramTypeList = new ArrayList<>();
+			for(int i = 0; i < node.nChildren() - 1; i++) {
+				paramTypeList.add(node.child(i).getType());
+			}
+			Type returnType = node.child(node.nChildren() - 1).getType();
+			node.setType(new Lambda(paramTypeList, returnType));
+		} else {
+			if (node.getToken().isLextant(Keyword.NULL)) {
 				node.setType(new NullType());
 			} else {
 				node.setType(PrimitiveType.fromToken(node.typeToken()));
 			}
-		} else { 
-			node.setType(new Array(node.child(0).getType()));
 		}
 	}
 
@@ -242,21 +299,24 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		List<Type> childTypes = Arrays.asList(node.child(0).getType());
 		Lextant operator = operatorFor(node);
 
-		if(node.getToken().isLextant(Keyword.LENGTH, Keyword.CLONE, Keyword.DEALLOC) && !(childTypes.get(0) instanceof Array)) {
+		if (node.getToken().isLextant(Keyword.LENGTH, Keyword.CLONE, Keyword.DEALLOC)
+				&& !(childTypes.get(0) instanceof Array)) {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
-		} else if(node.getToken().isLextant(Punctuator.NOT) && !(childTypes.get(0).equivalent(PrimitiveType.BOOLEAN))) {
+		} else if (node.getToken().isLextant(Punctuator.NOT)
+				&& !(childTypes.get(0).equivalent(PrimitiveType.BOOLEAN))) {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
-		} else if(node.getToken().isLextant(Keyword.CALL) && !(node.child(0) instanceof KNaryOperatorNode && node.child(0).child(0).getType() instanceof Lambda)) {
+		} else if (node.getToken().isLextant(Keyword.CALL) && !(node.child(0) instanceof KNaryOperatorNode
+				&& node.child(0).child(0).getType() instanceof Lambda)) {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
 			return;
 		}
-		
-		if(node.getToken().isLextant(Keyword.CLONE)) {
+
+		if (node.getToken().isLextant(Keyword.CLONE)) {
 			node.setType(node.child(0).getType());
-		} else if(node.getToken().isLextant(Keyword.CALL)) {
+		} else if (node.getToken().isLextant(Keyword.CALL)) {
 			node.setType(node.child(0).getType());
 			return;
 		}
@@ -277,30 +337,35 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		LextantToken token = (LextantToken) node.getToken();
 		return token.getLextant();
 	}
-	
+
 	@Override
 	public void visitLeave(KNaryOperatorNode node) {
 		// As of now, KNaryOperatorNodes are used just for function invocations
 		assert node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION);
 		assert node.nChildren() > 0;
-		
+
+		if (!(node.child(0).getType() instanceof Lambda)) {
+			notLambdaInvoked(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
+		}
+
 		Lambda lambdaType = (Lambda) node.child(0).getType();
-		
+
 		// Check types of params against the children types
-		ArrayList<Type> paramTypes = new ArrayList<>();
-		for(int i = 1; i < node.nChildren(); i++) {
+		List<Type> paramTypes = new ArrayList<>();
+		for (int i = 1; i < node.nChildren(); i++) {
 			paramTypes.add(node.child(i).getType());
 		}
-		
-		if(lambdaType.equivalentParams(paramTypes)) {
+
+		if (lambdaType.equivalentParams(paramTypes)) {
 			/*
-			 * Two cases:
-			 * 1. If return type is null and not called by 'call' -> error node
+			 * Two cases: 1. If return type is null and not called by 'call' -> error node
 			 * 2. All other cases
 			 */
-			
+
 			Type returnType = lambdaType.getReturnType();
-			if(!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
+			if (!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
 				funcReturnNullUsedAsAssignment(node);
 				node.setType(PrimitiveType.ERROR);
 			}
@@ -311,97 +376,103 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			node.setType(PrimitiveType.ERROR);
 		}
 	}
-	
+
 	private void promoteNode(ParseNode node, Type typeToCastTo, int childNumber) {
 		ParseNode childToReplace = node.child(childNumber);
-		
+
 		Type typeToCastFrom = node.child(childNumber).getType();
 		TypeNode typeNode;
-		if(typeToCastTo.equivalent(PrimitiveType.INTEGER)) {
+		if (typeToCastTo.equivalent(PrimitiveType.INTEGER)) {
 			typeNode = new TypeNode(Keyword.INT.prototype());
-		} else if(typeToCastTo.equivalent(PrimitiveType.FLOATING)) {
+		} else if (typeToCastTo.equivalent(PrimitiveType.FLOATING)) {
 			typeNode = new TypeNode(Keyword.FLOAT.prototype());
-		} else  {
+		} else {
 			typeNode = new TypeNode(Keyword.RAT.prototype());
 		}
-		
+
 		BinaryOperatorNode nodeToAdd = null;
 		FunctionSignatures signatures = FunctionSignatures.signaturesOf(Punctuator.CAST);
-		if(typeToCastFrom.equivalent(PrimitiveType.CHARACTER) && !typeToCastTo.equivalent(PrimitiveType.INTEGER)) {
+		if (typeToCastFrom.equivalent(PrimitiveType.CHARACTER) && !typeToCastTo.equivalent(PrimitiveType.INTEGER)) {
 			TypeNode intermediateTypeNode = new TypeNode(Keyword.INT.prototype());
 			intermediateTypeNode.setType(PrimitiveType.INTEGER);
-			FunctionSignature castSignature = signatures.acceptingSignature(Arrays.asList(PrimitiveType.CHARACTER, PrimitiveType.INTEGER));
-			nodeToAdd = BinaryOperatorNode.withChildren(Punctuator.CAST.prototype(), childToReplace, intermediateTypeNode);
+			FunctionSignature castSignature = signatures
+					.acceptingSignature(Arrays.asList(PrimitiveType.CHARACTER, PrimitiveType.INTEGER));
+			nodeToAdd = BinaryOperatorNode.withChildren(Punctuator.CAST.prototype(), childToReplace,
+					intermediateTypeNode);
 			nodeToAdd.setSignature(castSignature);
 			nodeToAdd.setType(castSignature.resultType());
 			typeToCastFrom = PrimitiveType.INTEGER;
 		}
-		
+
 		typeNode.setType(typeToCastTo);
-		FunctionSignature castSignature = signatures.acceptingSignature(Arrays.asList(typeToCastFrom, typeNode.getType()));
-		nodeToAdd = BinaryOperatorNode.withChildren(Punctuator.CAST.prototype(), nodeToAdd != null ? nodeToAdd : childToReplace, typeNode);
+		FunctionSignature castSignature = signatures
+				.acceptingSignature(Arrays.asList(typeToCastFrom, typeNode.getType()));
+		nodeToAdd = BinaryOperatorNode.withChildren(Punctuator.CAST.prototype(),
+				nodeToAdd != null ? nodeToAdd : childToReplace, typeNode);
 		nodeToAdd.setSignature(castSignature);
 		nodeToAdd.setType(castSignature.resultType());
 		node.replaceChild(childToReplace, nodeToAdd);
 	}
-	
-	private FunctionSignature findSuitableSignature(ParseNode node, FunctionSignatures signatures, List<Type> childTypes) {
+
+	private FunctionSignature findSuitableSignature(ParseNode node, FunctionSignatures signatures,
+			List<Type> childTypes) {
 		assert childTypes.size() > 0;
 		int nChildren = childTypes.size();
 
 		boolean[] elligibleToCast = new boolean[nChildren];
-		for(int i = 0; i < nChildren; i++) {
+		for (int i = 0; i < nChildren; i++) {
 			Type type = childTypes.get(i);
-			if(type.equivalent(PrimitiveType.CHARACTER) || type.equivalent(PrimitiveType.INTEGER)) {
+			if (type.equivalent(PrimitiveType.CHARACTER) || type.equivalent(PrimitiveType.INTEGER)) {
 				elligibleToCast[i] = true;
 			} else {
 				elligibleToCast[i] = false;
 			}
 		}
-		
-		for(int i = 0; i < childTypes.size(); i++) {
+
+		for (int i = 0; i < childTypes.size(); i++) {
 			List<Type> potentialChildTypes = new ArrayList<>(childTypes);
-			if(elligibleToCast[i] && !(node.child(i) instanceof TypeNode)) {
+			if (elligibleToCast[i] && !(node.child(i) instanceof TypeNode)) {
 				// First try for left operand
-				if(childTypes.get(i).equivalent(PrimitiveType.CHARACTER)) {
+				if (childTypes.get(i).equivalent(PrimitiveType.CHARACTER)) {
 					// Try to find a unique signature
 					potentialChildTypes.set(i, PrimitiveType.INTEGER);
 					FunctionSignature potentialSig = signatures.acceptingSignature(potentialChildTypes);
-					if(potentialSig.accepts(potentialChildTypes)) {
+					if (potentialSig.accepts(potentialChildTypes)) {
 						promoteNode(node, potentialSig.getParamTypes()[i], i);
-						for(int j = 0; j < childTypes.size(); j++) {
+						for (int j = 0; j < childTypes.size(); j++) {
 							childTypes.set(j, potentialChildTypes.get(j));
 						}
 						return potentialSig;
 					}
-				} 
+				}
 
 				// Try to find all floating and rational casting matching signatures.
-				// If more than 1 found, abort and issue error. If only 1 found, that's the result.
+				// If more than 1 found, abort and issue error. If only 1 found, that's the
+				// result.
 				int matchesFound = 0;
 				potentialChildTypes.set(i, PrimitiveType.FLOATING);
 				FunctionSignature potentialSig = signatures.acceptingSignature(potentialChildTypes);
-				if(potentialSig.accepts(potentialChildTypes)) { 
+				if (potentialSig.accepts(potentialChildTypes)) {
 					matchesFound++;
-					for(int j = 0; j < childTypes.size(); j++) {
+					for (int j = 0; j < childTypes.size(); j++) {
 						childTypes.set(j, potentialChildTypes.get(j));
 					}
 				}
 				potentialChildTypes.set(i, PrimitiveType.RATIONAL);
 				FunctionSignature anotherPotentialSig = signatures.acceptingSignature(potentialChildTypes);
-				if(anotherPotentialSig.accepts(potentialChildTypes)) {
-					if(matchesFound == 1) {
+				if (anotherPotentialSig.accepts(potentialChildTypes)) {
+					if (matchesFound == 1) {
 						// Issue an error as we matched more than one.
 						return FunctionSignature.nullInstance();
 					} else {
 						// We found the matching signature
 						promoteNode(node, anotherPotentialSig.getParamTypes()[i], i);
-						for(int j = 0; j < childTypes.size(); j++) {
+						for (int j = 0; j < childTypes.size(); j++) {
 							childTypes.set(j, potentialChildTypes.get(j));
 						}
 						return anotherPotentialSig;
 					}
-				} else if(matchesFound == 1) {
+				} else if (matchesFound == 1) {
 					promoteNode(node, potentialSig.getParamTypes()[i], i);
 					return potentialSig;
 				}
@@ -428,7 +499,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			// Try promoting and check again
 			signature = findSuitableSignature(node, signatures, childTypes);
 //			if(!signature.isNull()) {
-			if(signature.accepts(childTypes)) {
+			if (signature.accepts(childTypes)) {
 				node.setType(signature.resultType());
 				node.setSignature(signature);
 			} else {
@@ -488,6 +559,34 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	}
 
 	@Override
+	public void visit(BreakNode node) {
+		for (ParseNode immParent : node.pathToRoot()) {
+
+			if (immParent instanceof WhileStatementNode) {
+				node.setEnclosingWhileEndLabel(((WhileStatementNode) immParent).getEndLabel());
+				return;
+			}
+		}
+
+		breakStatementNotInLoop(node);
+		node.setType(PrimitiveType.ERROR);
+	}
+
+	@Override
+	public void visit(ContinueNode node) {
+		for (ParseNode immParent : node.pathToRoot()) {
+
+			if (immParent instanceof WhileStatementNode) {
+				node.setEnclosingWhileStartLabel(((WhileStatementNode) immParent).getStartLabel());
+				return;
+			}
+		}
+
+		continueStatementNotInLoop(node);
+		node.setType(PrimitiveType.ERROR);
+	}
+
+	@Override
 	public void visitEnter(PopulatedArrayNode node) {
 	}
 
@@ -495,8 +594,8 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(PopulatedArrayNode node) {
 		assert node.nChildren() > 0;
 		Type type = node.child(0).getType();
-		
-		if(type instanceof PrimitiveType) {
+
+		if (type instanceof PrimitiveType) {
 			// Only then promotions are allowed
 			Type finalType = PrimitiveType.NO_TYPE;
 			ArrayList<Type> typesGiven = new ArrayList<>();
@@ -504,35 +603,36 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			boolean thereIsFloating = false;
 			boolean invalidTypeFound = false;
 			ArrayList<ParseNode> childrenOfThisNode = new ArrayList<>();
-			for(ParseNode childNode: node.getChildren()) {
+			for (ParseNode childNode : node.getChildren()) {
 				Type childType = childNode.getType();
 				childrenOfThisNode.add(childNode);
-				
-				if(!typesGiven.contains(childType)) {
+
+				if (!typesGiven.contains(childType)) {
 					typesGiven.add(childType);
 					thereIsFloating = thereIsFloating || childType == PrimitiveType.FLOATING;
 					thereIsRational = thereIsRational || childType == PrimitiveType.RATIONAL;
 				}
-				
-				if(!PrimitiveType.isATypeInvolvedInPromotions(childType)) {
+
+				if (!PrimitiveType.isATypeInvolvedInPromotions(childType)) {
 					// Return as nothing can be done about this.
 					invalidTypeFound = true;
 				}
 			}
-			if(typesGiven.size() == 1) {
+			if (typesGiven.size() == 1) {
 				finalType = typesGiven.get(0);
 				node.setType(new Array(finalType));
 				return;
-			} else if((thereIsFloating && thereIsRational) || invalidTypeFound) {
+			} else if ((thereIsFloating && thereIsRational) || invalidTypeFound) {
 				typeCheckError(node, typesGiven);
 				node.setType(PrimitiveType.ERROR);
 				return;
 			}
-			
-			Type typeToCastTo = thereIsRational ? PrimitiveType.RATIONAL : thereIsFloating ? PrimitiveType.FLOATING : PrimitiveType.INTEGER;
-			for(int i = 0; i < childrenOfThisNode.size(); i++) {
+
+			Type typeToCastTo = thereIsRational ? PrimitiveType.RATIONAL
+					: thereIsFloating ? PrimitiveType.FLOATING : PrimitiveType.INTEGER;
+			for (int i = 0; i < childrenOfThisNode.size(); i++) {
 				ParseNode cNode = childrenOfThisNode.get(i);
-				if(!cNode.getType().equals(typeToCastTo)) {
+				if (!cNode.getType().equals(typeToCastTo)) {
 					promoteNode(node, typeToCastTo, i);
 				}
 			}
@@ -540,14 +640,14 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		} else {
 			boolean unmatchingFound = false;
 			ArrayList<Type> childTypes = new ArrayList<>();
-			for(ParseNode cNode: node.getChildren()) {
-				if(!cNode.getType().equivalent(type)) {
+			for (ParseNode cNode : node.getChildren()) {
+				if (!cNode.getType().equivalent(type)) {
 					unmatchingFound = true;
 				}
 				childTypes.add(cNode.getType());
 			}
-			
-			if(unmatchingFound) {
+
+			if (unmatchingFound) {
 				typeCheckError(node, childTypes);
 				node.setType(PrimitiveType.ERROR);
 			} else {
@@ -571,9 +671,9 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 	private boolean isBeingDeclared(IdentifierNode node) {
 		ParseNode parent = node.getParent();
-		return (parent instanceof DeclarationNode) && (node == parent.child(0));
+		return (parent instanceof DeclarationNode || parent instanceof FunctionNode) && (node == parent.child(0));
 	}
-	
+
 	private boolean isUsedAsFunctionParameter(IdentifierNode node) {
 		ParseNode parent = node.getParent();
 		return (parent instanceof ParameterSpecificationNode);
@@ -615,11 +715,41 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		logError("operator " + token.getLexeme() + " not defined for types " + operandTypes + " at "
 				+ token.getLocation());
 	}
-	
+
 	private void funcReturnNullUsedAsAssignment(ParseNode node) {
 		Token token = node.getToken();
-		
+
 		logError("Function returns null which cannot be used in assignment at " + token.getLocation());
+	}
+
+	private void IllegalReturnType(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Return argument does not match the return type of the lambda at " + token.getLocation());
+	}
+
+	private void returnStatementNotInFunction(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Return sttement found outside of lambda at " + token.getLocation());
+	}
+
+	private void breakStatementNotInLoop(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Break sttement found outside of loop at " + token.getLocation());
+	}
+
+	private void continueStatementNotInLoop(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("continue sttement found outside of loop at " + token.getLocation());
+	}
+
+	private void notLambdaInvoked(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Trying to invoke function on non-lambda type at " + token.getLocation());
 	}
 
 	private void logError(String message) {

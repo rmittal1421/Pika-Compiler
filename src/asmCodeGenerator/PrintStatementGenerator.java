@@ -7,6 +7,7 @@ import parseTree.nodeTypes.PrintStatementNode;
 import parseTree.nodeTypes.SpaceNode;
 import parseTree.nodeTypes.TabNode;
 import semanticAnalyzer.types.Array;
+import semanticAnalyzer.types.Lambda;
 import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 import asmCodeGenerator.ASMCodeGenerator.CodeVisitor;
@@ -34,8 +35,9 @@ public class PrintStatementGenerator {
 			} else if(child.getType() == PrimitiveType.RATIONAL) {
 				code.append(visitor.removeValueCode(child));      // [... num den]
 				appendPrintCodeForRationalNumbers(child);
-			}
-			else {
+			} else if(child.getType() instanceof Lambda) {
+				appendPrintCodeForLambda(child);
+			} else {
 				appendPrintCode(child);
 			}
 		}
@@ -54,11 +56,8 @@ public class PrintStatementGenerator {
 		String endLabel = labeller.newLabel("end-label");
 		
 		code.append(visitor.removeValueCode(node));
-		
-//		code.add(PStack);
+
 		code.add(Jump, firstCall);
-		
-//		code.add(Call, printStart);                              // [arrPointer returnPointer]
 		
 		// Stack has : [arrayPointer returnPointer]
 		code.add(Label, printStart);
@@ -70,24 +69,24 @@ public class PrintStatementGenerator {
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
 		code.add(PushD, RunTime.OPEN_BRACKET_SIGN_STRING);
 		code.add(Printf);
-		Macros.readIOffset(code, Record.RECORD_STATUS_OFFSET);   // [arrPointer status]
+		Macros.readIOffset(code, ASMConstants.RECORD_STATUS_OFFSET);   // [arrPointer status]
 		Macros.storeITo(code, RunTime.ARRAY_STATUS_FLAGS);       // [arrPointer]
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
-		Macros.readIOffset(code, Record.ARRAY_SUBTYPE_SIZE_OFFSET);// [arrPointer subtypeSize]
+		Macros.readIOffset(code, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);// [arrPointer subtypeSize]
 		Macros.storeITo(code, RunTime.ARRAY_SUBTYPE_SIZE);       // [arrPointer]
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
-		Macros.readIOffset(code, Record.ARRAY_LENGTH_OFFSET);    // [arrPointer length]
+		Macros.readIOffset(code, ASMConstants.ARRAY_LENGTH_OFFSET);    // [arrPointer length]
 		code.add(Duplicate);                                     // [arrPointer length length]
 		Macros.storeITo(code, RunTime.ARRAY_LENGTH);             // [arrPointer length]
 		code.add(JumpFalse, endLabel);                           // [arrPointer]
-		code.add(PushI, Record.ARRAY_HEADER_SIZE);              
+		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);              
 		code.add(Add);                                           // [baseForFirstElement]
 		
 		code.add(Label, recursivePrint);
 		
 		// Now check if status said that elements are arrays
 		Macros.loadIFrom(code, RunTime.ARRAY_STATUS_FLAGS);      // [baseForCurrentElement status]
-		code.add(PushI, Record.STATUS_FLAG_FOR_REFERENCE);
+		code.add(PushI, ASMConstants.STATUS_FLAG_FOR_REFERENCE);
 		code.add(BTAnd);                                         // [baseForCurrentElement 0 or 1]
 		
 		// If 0 : it is not an array
@@ -116,9 +115,12 @@ public class PrintStatementGenerator {
 		
 		if(concreteType.equivalent(PrimitiveType.RATIONAL)) {
 			appendPrintCodeForRationalNumbers(node);
+		} else if(concreteType instanceof Lambda) {
+			code.add(Pop);
+			code.add(PushD, RunTime.LAMBDA_PRINT_STRING);
+			code.add(Printf);
 		} else {
 			if(concreteType.equivalent(PrimitiveType.BOOLEAN)) {
-//				Labeller newLabeller = new Labeller("print-boolean");
 				String trueLabel = labeller.newLabel("true");
 				String boolEndLabel = labeller.newLabel("join");
 
@@ -179,6 +181,17 @@ public class PrintStatementGenerator {
 		code.add(Label, trueLabel);
 		code.add(PushD, RunTime.BOOLEAN_TRUE_STRING);
 		code.add(Label, endLabel);
+	}
+	
+	private void appendPrintCodeForLambda(ParseNode node) {
+		if(!(node.getType() instanceof Lambda)) {
+			return;
+		}
+		
+		code.append(visitor.removeValueCode(node));
+		code.add(Pop);
+		code.add(PushD, RunTime.LAMBDA_PRINT_STRING);
+		code.add(Printf);
 	}
 	
 	private void appendPrintCodeForRationalNumbers(ParseNode node) {

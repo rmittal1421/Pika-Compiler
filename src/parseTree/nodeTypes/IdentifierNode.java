@@ -43,15 +43,35 @@ public class IdentifierNode extends ParseNode {
 	}
 	
 ////////////////////////////////////////////////////////////
-// Speciality functions
+// Specialty functions
 
 	public Binding findVariableBinding() {
 		String identifier = token.getLexeme();
-
+		
 		for(ParseNode current : pathToRoot()) {
 			if(current.containsBindingOf(identifier)) {
 				declarationScope = current.getScope();
 				return current.bindingOf(identifier);
+			}
+			else if(current instanceof LambdaNode) {
+				// Next you should check in program node
+				return findInGlobalScope(current, identifier);
+			}
+		}
+		useBeforeDefineError();
+		return Binding.nullInstance();
+	}
+	
+	public Binding findInGlobalScope(ParseNode current, String identifier) {
+		for(ParseNode parentOfCurrent: current.pathToRoot()) {
+			if(parentOfCurrent instanceof ProgramNode) {
+				if(parentOfCurrent.containsBindingOf(identifier)) {
+					declarationScope = parentOfCurrent.getScope();
+					return parentOfCurrent.bindingOf(identifier);
+				} else {
+					useBeforeDefineError();
+					return Binding.nullInstance();
+				}
 			}
 		}
 		useBeforeDefineError();

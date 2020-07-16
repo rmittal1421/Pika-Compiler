@@ -43,15 +43,27 @@ public class Lambda implements Type {
 	public boolean equivalent(Type otherType) {
 		if(otherType instanceof Lambda) {
 			Lambda otherLambda = (Lambda)otherType;
-			// TODO: Check if equals is calling equivalent or not
-			return paramTypes.equals(otherLambda.getParamTypes()) && 
+			return equivalentParams(((Lambda) otherType).getParamTypes()) && 
 					returnType.equivalent(otherLambda.getReturnType());
 		}
 		return false;
 	}
 	
-	public boolean equivalentParams(ArrayList<Type> paramTypes) {
-		return this.paramTypes.equals(paramTypes);
+	public boolean equivalentParams(List<Type> paramTypes) {
+		if(this.paramTypes == paramTypes) {
+			return true;
+		}
+		
+		if(this.paramTypes.size() != paramTypes.size()) {
+			return false;
+		}
+		
+		for(int i = 0; i < paramTypes.size(); i++) {
+			if(!(this.paramTypes.get(i).equivalent(paramTypes.get(i)))) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	@Override

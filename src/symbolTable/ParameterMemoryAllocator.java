@@ -31,9 +31,6 @@ public class ParameterMemoryAllocator implements MemoryAllocator {
 		updateMin();
 		this.listOfLocationsAllocated.add(new MemoryLocation(accessor, baseAddress, currentOffset));
 		return this.listOfLocationsAllocated.get(this.listOfLocationsAllocated.size() - 1);
-		
-		// TODO: remove this commented out line after everything is running fine.
-//		return new MemoryLocation(accessor, baseAddress, currentOffset);
 	}
 	private void updateMin() {
 		if(minOffset > currentOffset) {

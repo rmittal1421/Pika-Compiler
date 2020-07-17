@@ -408,7 +408,8 @@ public class Parser {
 		Token callToken = nowReading;
 		readToken();
 		
-		ParseNode functionInvocation = parseFunctionInvocationExpression(parseAtomicExpression());
+//		ParseNode functionInvocation = parseFunctionInvocationExpression(parseAtomicExpression());
+		ParseNode functionInvocation = parseExpression();
 		expect(Punctuator.TERMINATOR);
 		return UnaryOperatorNode.withChildren(callToken, functionInvocation);
 	}
@@ -840,7 +841,6 @@ public class Parser {
 
 	// Type parsing
 	private ParseNode parseTypeNode() {
-		// TODO: Fix this function to parse correctly
 		if (!startsTypeNode(nowReading)) {
 			return syntaxErrorNode("Type node");
 		}

@@ -1,7 +1,11 @@
-#func foo <>->null{
-#    print "foo called",_n_.
-#    return.
-#}
+func foo <>->null{
+    print "foo called",_n_.
+    return.
+}
+
+func ra<>->int {
+	return 1.
+}
 
 #exec {
 #    const foo := <>->null {print "Overriding foo in this scope". return. }.
@@ -40,5 +44,21 @@ exec {
     
     #const arr := alloc [[[int]]] (3).
     
-    call printThis(<int a>->null {print a;. return.}). 
+    call printThis(<int a>->null {print a;. return.}).
+    
+    #call <string msg> -> null {
+    #    print msg, _n_.
+    #    return.
+    #}("hello world"). 
+    
+    #const a := foo().
+    
+    #var a := 1//2.
+    #a := ra().
+    #print a + 1//2.
 }
+
+
+
+
+

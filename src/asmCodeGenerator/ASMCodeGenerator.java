@@ -650,8 +650,6 @@ public class ASMCodeGenerator {
 
 			newVoidCode(node);
 			code.append((childType instanceof NullType) ? removeVoidCode(node.child(0)) : removeValueCode(node.child(0)));
-			
-			// TODO: Check if this is working fine in case of no instruction added in inCaseNotNull
 			code.append(inCaseNotNull);
 		}
 

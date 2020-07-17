@@ -1,0 +1,11 @@
+func foo<> -> null {
+	return.
+}
+
+
+exec {
+	var a := 10.
+	call foo().
+	print a.
+	
+}

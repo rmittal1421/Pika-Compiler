@@ -138,7 +138,6 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		// within some local scope which is not global.
 		// Hence, fetch it's type
 		if (!(node.getParent() instanceof FunctionNode)) {
-			// TODO: Check if it is assigned to const
 			Lambda lambdaType = fetchLambdaSignature(node);
 			node.setType(lambdaType);
 
@@ -158,7 +157,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(ParameterSpecificationNode node) {
 		Type paramType = node.child(0).getType();
 		
-		//TODO: To be sure, add a safety check here that node.child(1) is identifier type
+		if(!(node.child(1) instanceof IdentifierNode)) {
+			parameterExpectedIdentifierError(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
+		}
+		
 		IdentifierNode identifierNode = (IdentifierNode) node.child(1);
 		identifierNode.setType(paramType);
 		node.setType(paramType);
@@ -750,6 +754,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("Trying to invoke function on non-lambda type at " + token.getLocation());
+	}
+	
+	private void parameterExpectedIdentifierError(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("ParameterSpecification expected identifier node after type at " + token.getLocation());
 	}
 
 	private void logError(String message) {

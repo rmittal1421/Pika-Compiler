@@ -24,13 +24,11 @@ public class Lambda implements Type {
 
 	@Override
 	public int getSize() {
-//		return subtype.getSize();
 		return 4;
 	}
 
 	@Override
 	public String infoString() {
-		// TODO: Make this return the actual thing
 		return toString();
 	}
 

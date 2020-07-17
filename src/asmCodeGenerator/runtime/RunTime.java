@@ -301,26 +301,27 @@ public class RunTime {
 		String subroutineStart = labeller.newLabel("subroutine-start");
 		String numGreaterLabel = labeller.newLabel("num-is-greater");
 		String subroutineEnd = labeller.newLabel("subroutine-end");
+		String numWasFoundZero = labeller.newLabel("num-was-0");
 		String coreEnd = labeller.newLabel("core-end-lowest-term");
 		
 		// Stack received: [... num den returnPointer]
 		frag.add(Label, LOWEST_TERMS);
-		
+				
 		Macros.declareI(frag, PC_TO_RETURN_TO);         
 		Macros.storeITo(frag, PC_TO_RETURN_TO);               // [... num den] & returnPointer saved
 		
 		Macros.declareI(frag, RATIONAL_GCD);
 
-		frag.add(Duplicate);                                  // [... num den den]
+		Macros.storeITo(frag, RATIONAL_DEN);                  // [... num]
+		Macros.storeITo(frag, RATIONAL_NUM);                  // [...]
+		
+		// Sanitize denominator
+		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... den]
 		frag.add(JumpFalse, RATIONAL_NUMBER_GIVEN_ZERO_DENOMINATOR);  // Goes to runtime error if den evaluates to be zero
 		
-		frag.add(Exchange);
-		frag.add(Duplicate);
-		frag.add(JumpFalse, coreEnd);
-		frag.add(Exchange);
-		
-		Macros.storeITo(frag, RATIONAL_DEN);                  // [... num] & den saved
-		Macros.storeITo(frag, RATIONAL_NUM);                  // [...] & num saved
+		// Sanitize numerator
+		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... num]
+		frag.add(JumpFalse, numWasFoundZero);                 // [...] & jumps if num was 0 to the handling of this case
 		
 		/*
 		 * pseudoCode:
@@ -333,10 +334,22 @@ public class RunTime {
 		 */
 		
 		Macros.loadIFrom(frag, RATIONAL_NUM);
-		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den] but treat as [...]
+		Macros.loadIFrom(frag, RATIONAL_DEN);
+		frag.add(Multiply);                                   // [... num*den] but treat as if [...] ----> actual product stored
 		
-		Macros.loadMakePositiveStore(frag, RATIONAL_DEN);
-		Macros.loadMakePositiveStore(frag, RATIONAL_NUM);
+		Macros.loadMakePositiveStore(frag, RATIONAL_DEN);     // [... num] & den made positive
+		Macros.loadMakePositiveStore(frag, RATIONAL_NUM);     // [...] & num made positive
+		
+		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... num]
+		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den]
+		frag.add(Multiply);                                   // [... num*den]    -----> product of num and den both being positive
+		
+		// Remember we stored their actual product as well
+		frag.add(Divide);                                     // [... -1 or 1] depending on we want -ve or not. (Leave it there)
+		
+		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... (-1 or 1) num]
+		frag.add(Multiply);                                   // [... num] (Maybe +ve or -ve which is final now)
+		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den]       and behave as if it it [...]
 		
 		frag.add(Label, subroutineStart);
 		
@@ -350,7 +363,7 @@ public class RunTime {
 		// Comes here which means that num and den are not equal yet
 		frag.add(Duplicate);                                  // [... num-den num-den]
 		frag.add(JumpPos, numGreaterLabel);                   // [... num-den]
-		// Else den is greater
+		// Else den is greater or equal
 		frag.add(Negate);                                     // [... den-num]
 		Macros.storeITo(frag, RATIONAL_DEN);                  // [...]
 		frag.add(Jump, subroutineStart);                      // [...]
@@ -369,6 +382,11 @@ public class RunTime {
 		Macros.loadIFrom(frag, RATIONAL_GCD);
 		frag.add(Divide);                                     // [... den/gcd num/gcd]
 		frag.add(Exchange);                                   // [... refactoredNum refactoredDen]
+		frag.add(Jump, coreEnd);
+		
+		frag.add(Label, numWasFoundZero);                     // [...] & num was 0 den was not
+		frag.add(PushI, 0);                                   // [... 0]
+		frag.add(PushI, 1);                                   // [... 0 1]
 		
 		frag.add(Label, coreEnd);
 		Macros.loadIFrom(frag, PC_TO_RETURN_TO);              // [... num den returnPointer]

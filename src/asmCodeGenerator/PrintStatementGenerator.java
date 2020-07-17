@@ -207,41 +207,26 @@ public class PrintStatementGenerator {
 		String intHandled = labeller.newLabel("int-handled");
 		String printFraction = labeller.newLabel("print-fraction");
 		String endLabel = labeller.newLabel("end-label");
-		
-//		code.append(visitor.removeValueCode(node));      // [... num den]
-		
-		code.add(Duplicate);                             // [... num den den]
-		Macros.storeITo(code, RunTime.RATIONAL_DEN);     // [... num den]
-		code.add(Exchange);                              // [... den num]
-		code.add(Duplicate);                             // [... den num num]
-		Macros.storeITo(code, RunTime.RATIONAL_NUM);     // [... den num]
+
+		// Stack is [... num den]
+		Macros.storeITo(code, RunTime.RATIONAL_DEN);     // [... num]
+		code.add(Duplicate);                             // [... num num]
+		Macros.storeITo(code, RunTime.RATIONAL_NUM);     // [... num]
 		
 		// If num is zero, just print 0
-		code.add(Duplicate);                             // [... den num num]
-		code.add(JumpFalse, numIsZero);                  // [... den num]
-		code.add(Jump, handleSign);
+		code.add(Duplicate);                             // [... num num]
+		code.add(JumpFalse, numIsZero);                  // [... num]
 		
-		code.add(Label, numIsZero);                      // [... den 0]
-		code.add(Exchange);                              // [... 0 den]
-		code.add(Pop);                                   // [... 0]
+		code.add(Duplicate);                             // [... num num]
+		code.add(JumpPos, signHandled);                  // [... num]
+		code.add(PushD, RunTime.NEGATIVE_SIGN_STRING);   
+		code.add(Printf);                                // [...]
+		code.add(Jump, signHandled);
+		
+		code.add(Label, numIsZero);                      // [... 0]
 		code.add(PushD, intPrintFormat);
 		code.add(Printf);                                // [...]
-		code.add(Jump, endLabel);
-		
-		// Print negative if required
-		code.add(Label, handleSign);                     // [... den num]
-		code.add(Multiply);                              // [... den*num]
-		code.add(JumpNeg, printNegative);                // [...]
-		code.add(Jump, signHandled);
-		
-		code.add(Label, printNegative);
-		code.add(PushD, RunTime.NEGATIVE_SIGN_STRING);
-		code.add(Printf);
-		// Make both num and den pos if neg
-		Macros.loadMakePositiveStore(code, RunTime.RATIONAL_NUM);
-		Macros.loadMakePositiveStore(code, RunTime.RATIONAL_DEN);
-		
-		code.add(Jump, signHandled);
+		code.add(Jump, endLabel);                        // Jumps to endLabel
 		
 		code.add(Label, signHandled);                    // [...]       
 		Macros.loadIFrom(code, RunTime.RATIONAL_NUM);    // [... num]
@@ -271,7 +256,8 @@ public class PrintStatementGenerator {
 		code.add(PushD, RunTime.UNDERSCORE_SIGN_STRING);
 		code.add(Printf);
 		
-		// Print num
+		// Print num (Make it positive before hand even if it was not negative)
+		Macros.loadMakePositiveStore(code, RunTime.RATIONAL_NUM);
 		Macros.loadIFrom(code, RunTime.RATIONAL_NUM);    // [... num]
 		code.add(PushD, intPrintFormat);
 		code.add(Printf);                                // [...]
@@ -286,7 +272,6 @@ public class PrintStatementGenerator {
 		code.add(Printf);                                // [...]
 		
 		code.add(Label, endLabel);
-		code.add(Nop);
 	}
 
 

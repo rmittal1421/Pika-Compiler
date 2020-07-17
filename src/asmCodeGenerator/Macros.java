@@ -109,7 +109,6 @@ public class Macros {
 		frag.add(Label, makePositive);    // [... val] and val is -ve
 		frag.add(Negate);                 // [... val] and val is +ve
 		storeITo(frag, baseLocation);     // [...]
-		frag.add(Jump, endLabel);
 		
 		frag.add(Label, endLabel);
 	}

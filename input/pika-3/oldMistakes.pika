@@ -1,5 +1,19 @@
 exec {
-	var a := 1.
-	a := 2.
-	print a.
+	const a := "the".		# 16 bytes
+	const b := "proud".		# 18 bytes
+	const c := "man's".		# 18 bytes
+	const d := "contumely".	# 22 bytes
+	
+	var collect := [a, b, c, d].
+	print collect, _n_.
+	
+	dealloc collect.
+	var reuse := [14].		# 20 bytes
+	
+	# now check the strings
+	# "contumely" could be messed up if the string constants are being
+	# returned to the deallocator.  (as could "man's")
+
+	print a; b; c; d; _n_.
+	
 }

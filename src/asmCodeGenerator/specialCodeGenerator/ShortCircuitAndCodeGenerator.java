@@ -8,7 +8,6 @@ import parseTree.ParseNode;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Duplicate;
 import static asmCodeGenerator.codeStorage.ASMOpcode.JumpFalse;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Pop;
-import static asmCodeGenerator.codeStorage.ASMOpcode.Jump;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Label;
 
 public class ShortCircuitAndCodeGenerator implements FullCodeGenerator {
@@ -26,15 +25,12 @@ public class ShortCircuitAndCodeGenerator implements FullCodeGenerator {
 		
 		// short circuiting test
 		fragment.add(Duplicate);
-		fragment.add(JumpFalse, falseLabel);
+		fragment.add(JumpFalse, endLabel);
 		fragment.add(Pop);
 		
 		// compute arg2
 		fragment.append(args[1]);
-		fragment.add(Jump, endLabel);
 		
-		// the end
-		fragment.add(Label, falseLabel);
 		fragment.add(Label, endLabel);
 		
 		return fragment;

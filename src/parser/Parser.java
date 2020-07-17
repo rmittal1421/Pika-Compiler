@@ -205,8 +205,8 @@ public class Parser {
 		if (!startsAssignmentStatement(nowReading)) {
 			return syntaxErrorNode("assignment statement");
 		}
-		
-		ParseNode target = parseExpression();
+	
+		ParseNode target = parseTarget();
 		Token assnToken = nowReading;
 		expect(Punctuator.ASSIGN);
 		ParseNode expr = parseExpression();
@@ -216,20 +216,31 @@ public class Parser {
 	}
 
 	private boolean startsAssignmentStatement(Token token) {
-		return startsExpression(token);
+		return startsTarget(token);
 	}
 
 	// target -> identifier
-	@SuppressWarnings("unused")
 	private ParseNode parseTarget() {
 		if (!startsTarget(nowReading)) {
 			return syntaxErrorNode("target");
 		}
-		return parseIdentifier();
+		
+		if(startsArrayIndexingExpression(nowReading)) {
+			return parseIndexingOrInvocationExpression();
+		} else if(startsParenthesizedExpression(nowReading)) {
+			expect(Punctuator.OPEN_PARANTHESES);
+			ParseNode target = parseTarget();
+			expect(Punctuator.CLOSE_PARENTHESES);
+			return target;
+		} else if(startsIdentifier(nowReading)) {
+			return parseIdentifier();
+		} else {
+			return syntaxErrorNode("Target Expression");
+		}
 	}
 
 	private boolean startsTarget(Token token) {
-		return startsIdentifier(token);
+		return startsIdentifier(token) || startsParenthesizedExpression(token) || startsArrayIndexingExpression(token);
 	}
 
 	// printStmt -> PRINT printExpressionList .
@@ -618,7 +629,7 @@ public class Parser {
 		if (startsExplicitUnaryOperatorExpression(nowReading)) {
 			Token unaryOperationToken = nowReading;
 			readToken();
-			ParseNode child = parseExpression();
+			ParseNode child = parseUnaryOperatorExpression();
 
 			return UnaryOperatorNode.withChildren(unaryOperationToken, child);
 		} else {

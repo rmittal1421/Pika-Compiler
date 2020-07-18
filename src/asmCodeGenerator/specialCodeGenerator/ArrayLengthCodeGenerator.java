@@ -3,7 +3,7 @@ package asmCodeGenerator.specialCodeGenerator;
 import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.ASMConstants;
+import asmCodeGenerator.ASMCodeGenerationConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType;
 import asmCodeGenerator.runtime.RunTime;
@@ -19,7 +19,7 @@ public class ArrayLengthCodeGenerator implements SimpleCodeGenerator {
 		
 		// Check if the array is null
 		frag.add(JumpFalse, RunTime.NULL_ARRAY_RUNTIME_ERROR);
-		Macros.readIOffset(frag, ASMConstants.ARRAY_LENGTH_OFFSET);
+		Macros.readIOffset(frag, ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET);
 		return frag;
 	}
 

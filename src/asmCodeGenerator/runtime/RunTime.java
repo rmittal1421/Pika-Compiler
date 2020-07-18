@@ -5,7 +5,7 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.Labeller;
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.ASMConstants;
+import asmCodeGenerator.ASMCodeGenerationConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 
 public class RunTime {

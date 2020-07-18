@@ -419,8 +419,8 @@ public class Parser {
 		Token callToken = nowReading;
 		readToken();
 		
-//		ParseNode functionInvocation = parseFunctionInvocationExpression(parseAtomicExpression());
-		ParseNode functionInvocation = parseExpression();
+		ParseNode functionInvocation = parseFunctionInvocationExpression(parseAtomicExpression());
+//		ParseNode functionInvocation = parseExpression();
 		expect(Punctuator.TERMINATOR);
 		return UnaryOperatorNode.withChildren(callToken, functionInvocation);
 	}

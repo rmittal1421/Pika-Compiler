@@ -84,89 +84,6 @@ public class ASMCodeGenerator {
 		return visitor.removeRootCode(root);
 	}
 
-	public static void createRecord(ASMCodeFragment code, int typecode, int statusFlags) {
-		code.add(Call, MemoryManager.MEM_MANAGER_ALLOCATE);
-		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.RECORD_TYPEID_OFFSET, typecode);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.RECORD_STATUS_OFFSET, statusFlags);
-	}
-
-	// Stack: [... nElems]
-	public static void createEmptyArrayRecord(ASMCodeFragment code, int statusFlags, int subtypeSize) {
-		final int typecode = ASMConstants.ARRAY_TYPE_ID;
-
-		// Give error if nElements < 0
-		code.add(Duplicate); // [... nElems nElems]
-		code.add(JumpNeg, RunTime.NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR); // [... nElems]
-
-		// Compute record size (Includes ASM header + aggregated size of elements)
-		code.add(Duplicate); // [... nElems nElems]
-		code.add(PushI, subtypeSize); // [... nElems nElems subtypeSize]
-		code.add(Multiply); // [... nElems nElems*subtypeSize] === [... nElems elemsSize]
-		code.add(Duplicate); // [... nElems elemsSize elemsSize]
-		Macros.storeITo(code, RunTime.ARRAY_DATASIZE_TEMPORARY); // [... nElems elemsSize]
-		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... nElems elemsSize headerSize]
-		code.add(Add); // [... nElems recordSize]
-
-		// Call createRecord
-		createRecord(code, typecode, statusFlags); // [... nElems]
-
-		// Zero out elements of array
-		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY); // [... nElems recordPointer]
-		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... nElems recordPointer arrayHeaderSize]
-		code.add(Add); // [... nElems baseAddressToAddFirstElement]
-		Macros.loadIFrom(code, RunTime.ARRAY_DATASIZE_TEMPORARY); // [... nElems baseAddressToAddFirstElement numBytes]
-		code.add(Call, RunTime.CLEAR_N_BYTES);
-
-		// Fill in array header
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET,
-				subtypeSize);
-		Macros.writeIPtrOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_LENGTH_OFFSET);
-	}
-
-	// Stack: [... recordSize]
-	public static void createPopulatedArrayRecord(ASMCodeFragment code, int statusFlags, Type subtype,
-			List<ASMCodeFragment> codeForChildren) {
-		assert codeForChildren.size() > 0;
-
-		int subtypeSize = subtype.getSize();
-		final int typecode = ASMConstants.ARRAY_TYPE_ID;
-
-		createRecord(code, typecode, statusFlags); // [...]
-		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY); // [... recordPointer]
-
-		// We need to duplicate this since the recordPointer stored in
-		// RECORD_CREATION_TEMPORARY might be replaced by one of
-		// children of this node as they can be an array too and they will use that
-		// runtime variable. Hence, later when we want
-		// to put that on stack, we will load the wrong one as it is replaced. So
-		// duplicate it, after adding all the children's code
-		// storeItBack and then load later.
-		code.add(Duplicate);
-
-		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE); // [... recordPointer arrayHeaderSize]
-		code.add(Add); // [... baseAddressForFirstElement]
-
-//		ASMCodeFragment opcodeForStore = opcodeForStore(subtype);
-
-		for (ASMCodeFragment cCode : codeForChildren) { // [... baseAddressforNthElement]
-			code.add(Duplicate); // [... baseAddressForNthElement baseAddressForNthElement]
-			code.append(cCode); // [... baseAddressForNthElement baseAddressForNthElement cCode]
-			code.append(opcodeForStore(subtype)); // [... baseAddressForNthElement]
-//			code.add(StoreI);
-			code.add(PushI, subtypeSize); // [... baseAddressForNthElement subtypeSize]
-			code.add(Add); // [... baseAddressFor(N+1)thElement]
-		}
-		code.add(Pop); // [... baseAddressForFirstElement]
-
-		// Fill in array header
-		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET,
-				subtypeSize);
-		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY, ASMConstants.ARRAY_LENGTH_OFFSET,
-				codeForChildren.size());
-	}
-
 	// Spits out fragment for storing a value
 	public static ASMCodeFragment opcodeForStore(Type type) {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
@@ -416,11 +333,11 @@ public class ASMCodeGenerator {
 			// Step 1.
 			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... returnAddress SP]
 			code.add(Duplicate);                                                              // [... returnAddress SP SP]
-			code.add(PushI, ASMConstants.FRAME_POINTER_SIZE);                                 // [... returnAddress SP SP 4]
+			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE);                                 // [... returnAddress SP SP 4]
 			code.add(Subtract);                                                               // [... returnAddress SP SP-4]
 			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                    // [... returnAddress SP SP-4 FP]
 			code.add(StoreI);                                                                 // [... returnAddress SP]
-			code.add(PushI, ASMConstants.FUNCTION_CALL_EXTRA_BYTES);                          // [... returnAddress SP 8]
+			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);                          // [... returnAddress SP 8]
 			code.add(Subtract);                                                               // [... returnAddress SP-8]
 			code.add(Exchange);                                                               // [... SP-8 returnAddress]
 			code.add(StoreI);                                                                 // [...] and old FP and returnAddress are in memory now
@@ -431,7 +348,7 @@ public class ASMCodeGenerator {
 			
 			// Step 3.
 			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... SP]
-			int functionOverallSize = ASMConstants.FUNCTION_CALL_EXTRA_BYTES + node.child(node.nChildren() - 1).getScope().getAllocatedSize();
+			int functionOverallSize = ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES + node.child(node.nChildren() - 1).getScope().getAllocatedSize();
 			code.add(PushI, functionOverallSize);                                             // [... SP sizeOfFunctionCall]
 			code.add(Subtract);                                                               // [... newSP]
 			Macros.storeITo(code, RunTime.STACK_POINTER);                                     // [...]
@@ -450,13 +367,13 @@ public class ASMCodeGenerator {
 			// 6.1
 			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                     // [... returnedValue FP]
 			code.add(Duplicate);                                                               // [... returnedValue FP FP]
-			code.add(PushI, ASMConstants.FUNCTION_CALL_EXTRA_BYTES);                           // [... returnedValue FP FP 8]
+			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);                           // [... returnedValue FP FP 8]
 			code.add(Subtract);                                                                // [... returnedValue FP FP-8]
 			code.add(LoadI);                                                                   // [... returnedValue FP whereToReturnAddr]
 			code.add(Exchange);                                                                // [... returnedValue whereToReturnAddr FP]
 			
 			// 6.2
-			code.add(PushI, ASMConstants.FRAME_POINTER_SIZE);                                  // [... returnedValue whereToReturnAddr FP 4]
+			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE);                                  // [... returnedValue whereToReturnAddr FP 4]
 			code.add(Subtract);                                                                // [... returnedValue whereToReturnAddr FP-4]
 			code.add(LoadI);                                                                   // [... returnedValue whereToReturnAddr oldFramePointer]
 			Macros.storeITo(code, RunTime.FRAME_POINTER);                                      // [... returnedValue whereToReturnAddr]
@@ -922,16 +839,16 @@ public class ASMCodeGenerator {
 			newValueCode(node);
 
 			Type subtype = ((Array) node.getType()).getSubtype();
-			int statusFlags = subtype instanceof Array ? ASMConstants.STATUS_FLAG_FOR_REFERENCE
-					: ASMConstants.STATUS_FLAG_FOR_NON_REFERENCE;
+			int statusFlags = subtype instanceof Array ? ASMCodeGenerationConstants.STATUS_FLAG_FOR_REFERENCE
+					: ASMCodeGenerationConstants.STATUS_FLAG_FOR_NON_REFERENCE;
 			int nElems = node.nChildren();
 			ArrayList<ASMCodeFragment> codeForChildren = new ArrayList<>(nElems);
 			for (ParseNode cNode : node.getChildren()) {
 				codeForChildren.add(removeValueCode(cNode));
 			}
-			int recordSize = ASMConstants.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
+			int recordSize = ASMCodeGenerationConstants.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
 			code.add(PushI, recordSize); // [... recordSize] before calling to create a record
-			createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
+			DynamicRecordAllocation.createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
 
 			// Place the created record's address on the stack
 			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);

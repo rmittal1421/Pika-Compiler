@@ -69,24 +69,24 @@ public class PrintStatementGenerator {
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
 		code.add(PushD, RunTime.OPEN_BRACKET_SIGN_STRING);
 		code.add(Printf);
-		Macros.readIOffset(code, ASMConstants.RECORD_STATUS_OFFSET);   // [arrPointer status]
+		Macros.readIOffset(code, ASMCodeGenerationConstants.RECORD_STATUS_OFFSET);   // [arrPointer status]
 		Macros.storeITo(code, RunTime.ARRAY_STATUS_FLAGS);       // [arrPointer]
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
-		Macros.readIOffset(code, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);// [arrPointer subtypeSize]
+		Macros.readIOffset(code, ASMCodeGenerationConstants.ARRAY_SUBTYPE_SIZE_OFFSET);// [arrPointer subtypeSize]
 		Macros.storeITo(code, RunTime.ARRAY_SUBTYPE_SIZE);       // [arrPointer]
 		code.add(Duplicate);                                     // [arrPointer arrPointer]
-		Macros.readIOffset(code, ASMConstants.ARRAY_LENGTH_OFFSET);    // [arrPointer length]
+		Macros.readIOffset(code, ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET);    // [arrPointer length]
 		code.add(Duplicate);                                     // [arrPointer length length]
 		Macros.storeITo(code, RunTime.ARRAY_LENGTH);             // [arrPointer length]
 		code.add(JumpFalse, endLabel);                           // [arrPointer]
-		code.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);              
+		code.add(PushI, ASMCodeGenerationConstants.ARRAY_HEADER_SIZE);              
 		code.add(Add);                                           // [baseForFirstElement]
 		
 		code.add(Label, recursivePrint);
 		
 		// Now check if status said that elements are arrays
 		Macros.loadIFrom(code, RunTime.ARRAY_STATUS_FLAGS);      // [baseForCurrentElement status]
-		code.add(PushI, ASMConstants.STATUS_FLAG_FOR_REFERENCE);
+		code.add(PushI, ASMCodeGenerationConstants.STATUS_FLAG_FOR_REFERENCE);
 		code.add(BTAnd);                                         // [baseForCurrentElement 0 or 1]
 		
 		// If 0 : it is not an array

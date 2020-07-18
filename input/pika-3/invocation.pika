@@ -2,10 +2,51 @@ func foo<> -> null {
 	return.
 }
 
+func rajat<[int] a> -> null {
+	var i := 0.
+	while(i != a[0]) {
+		i := i + 1.
+		if(i == a[0] - 1) {
+			break.
+		} else {
+			continue.
+		}
+	}
+	
+	a[0] := 15.
+
+	return.
+}
+
+func sanyam<[int] a> -> bool {
+	if(a[0] == 15) {
+		return _true_.
+	}
+	
+	return _false_.
+}
+
+func diksha<>->null {
+
+return.
+}
+
 
 exec {
-	var a := 10.
-	call foo().
-	print a.
 	
+	#var raghav := [3].
+	#call rajat(raghav).
+	#print sanyam(raghav); _n_.
+	#call diksha().
+	
+	var b := (<<int> -> null foo> -> null {
+		call foo(10).
+		return.
+	}).
+	
+	const a := <int a> -> null { print a. return. }.
+	
+	#print (sanyam(allo c)).
+	const s := 1.
+	call foo().
 }

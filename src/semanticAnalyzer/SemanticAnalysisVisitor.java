@@ -569,6 +569,8 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingWhileEndLabel(((WhileStatementNode) immParent).getEndLabel());
 				return;
+			} else if(immParent instanceof LambdaNode) {
+				break;
 			}
 		}
 
@@ -583,6 +585,8 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingWhileStartLabel(((WhileStatementNode) immParent).getStartLabel());
 				return;
+			} else if(immParent instanceof LambdaNode) {
+				break;
 			}
 		}
 

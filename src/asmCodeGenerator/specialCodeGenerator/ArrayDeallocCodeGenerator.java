@@ -4,7 +4,7 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
 import asmCodeGenerator.Labeller;
 import asmCodeGenerator.Macros;
-import asmCodeGenerator.ASMConstants;
+import asmCodeGenerator.ASMCodeGenerationConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType;
 import asmCodeGenerator.runtime.MemoryManager;
@@ -46,22 +46,22 @@ public class ArrayDeallocCodeGenerator implements SimpleCodeGenerator {
 		frag.add(Label, notNullArray);                                          // [retP arr]
 		frag.add(Duplicate);                                                    // [retP arr arr]
 		
-		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
-		frag.add(PushI, ASMConstants.STATUS_TO_CHECK_DELETE_OR_PERM);           // [retP arr status checkDelOrPerm]
+		Macros.readIOffset(frag, ASMCodeGenerationConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
+		frag.add(PushI, ASMCodeGenerationConstants.STATUS_TO_CHECK_DELETE_OR_PERM);           // [retP arr status checkDelOrPerm]
 		frag.add(BTAnd);		                                                // [retP arr 0||!0]
 		frag.add(JumpTrue, doNotDeAllocAndClearUp);                              // [retP arr]
 
 		frag.add(Duplicate);                                                    // [retP arr arr]
 		frag.add(Duplicate);                                                    // [retP arr arr arr]
-		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr arr status]		
-		frag.add(PushI, ASMConstants.TURN_DELETE_BIT_1);                        // [retP arr arr status deleteBitChange]
+		Macros.readIOffset(frag, ASMCodeGenerationConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr arr status]		
+		frag.add(PushI, ASMCodeGenerationConstants.TURN_DELETE_BIT_1);                        // [retP arr arr status deleteBitChange]
 		frag.add(BTOr);		                                                    // [retP arr arr updatedStatus]
 		frag.add(Exchange);                                                     // [retP arr updatedStatus arr]
-		Macros.writeIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);      // [retP arr]
+		Macros.writeIOffset(frag, ASMCodeGenerationConstants.ARRAY_STATUS_FLAGS_OFFSET);      // [retP arr]
 
 		frag.add(Duplicate);	                                                // [retP arr arr]
-		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
-		frag.add(PushI, ASMConstants.STATUS_FLAG_FOR_REFERENCE);                // [retP arr subTypeRef]
+		Macros.readIOffset(frag, ASMCodeGenerationConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
+		frag.add(PushI, ASMCodeGenerationConstants.STATUS_FLAG_FOR_REFERENCE);                // [retP arr subTypeRef]
 		frag.add(BTAnd);                                                        // [retP arr 0||!0] -> if 1: array subtype, other not
 		
 		// If top of stack is 0: I do not need to recurse. I just dealloc this array
@@ -69,12 +69,12 @@ public class ArrayDeallocCodeGenerator implements SimpleCodeGenerator {
 
 		Macros.storeITo(frag, RunTime.ARRAY_INDEXING_ARRAY);                    // [retP]
 		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);                   // [retP arr]
-		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMConstants.ARRAY_LENGTH_OFFSET);        // [retP arr len]
-		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);  // [retP arr len subTypeSize] 
+		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET);        // [retP arr len]
+		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMCodeGenerationConstants.ARRAY_SUBTYPE_SIZE_OFFSET);  // [retP arr len subTypeSize] 
 		Macros.storeITo(frag, RunTime.ARRAY_SUBTYPE_SIZE);                      // [retP arr len]
 
 		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);                   // [retP arr len arr]
-		frag.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);                        // [retP arr len arr headerSize]
+		frag.add(PushI, ASMCodeGenerationConstants.ARRAY_HEADER_SIZE);                        // [retP arr len arr headerSize]
 		frag.add(Add);                                                          // [retP arr len baseForFirstElement]
 
 		// ------------ Start of loop --------------

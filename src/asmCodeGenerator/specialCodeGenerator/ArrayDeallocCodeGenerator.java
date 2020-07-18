@@ -15,114 +15,108 @@ public class ArrayDeallocCodeGenerator implements SimpleCodeGenerator {
 
 	@Override
 	public ASMCodeFragment generate(ParseNode node) {
-		Labeller labeller = new Labeller("dealloc-statement");
-		String firstCall = labeller.newLabel("first-call-dealloc");
-		String deallocStart = labeller.newLabel("dealloc-start");
-		String nullArray = labeller.newLabel("null-array");
-		String notNullArray = labeller.newLabel("not-null-array");
-		String recursiveDealloc = labeller.newLabel("recursive-dealloc");
-		String doNotDeallocate = labeller.newLabel("do-not-deallocate");
-		String commonPart = labeller.newLabel("common-part-dealloc");
-		String endLabel = labeller.newLabel("end-label-dealloc");
-		
 		ASMCodeFragment frag = new ASMCodeFragment(CodeType.GENERATES_VOID);
 		
-		// Stack currently is: [... arrayToDeallocBaseAddress]
-		frag.add(Jump, firstCall);                                    // [... arr]
+		Labeller labeller = new Labeller("dealloc-statement");
+		String firstCall = labeller.newLabel("base-dealloc-call");
+		String deallocStart = labeller.newLabel("dealloc-start");
+		String deallocLoopBegin = labeller.newLabel("dealloc-loop-begin");
+		String deallocLoopEnd = labeller.newLabel("dealloc-loop-end");
+		String nullArray = labeller.newLabel("null-array");
+		String notNullArray = labeller.newLabel("not-null-array");
+		String doNotDeAllocAndClearUp = labeller.newLabel("dealloc-cancel-clean-up");
+		String deallocateMe = labeller.newLabel("deallocate-current-array");
+		String coreEnd = labeller.newLabel("core-end");
+
+		// FUTURE TODO: For M4, check if type id is 7 while deallocating (However, it should be taken care of by semantic checker)
 		
-		frag.add(Call, deallocStart);                                 // [... arr returnPointer]
+		frag.add(Jump, firstCall);                                              // [arr]
+		frag.add(Label, deallocStart);                                          // [arr retP]
+		frag.add(Exchange);                                                     // [retP arr]	
+		frag.add(Duplicate);                                                    // [retP arr arr]
+		frag.add(JumpFalse, nullArray);                                         // [retP arr]
+		frag.add(Jump, notNullArray);                                           // [retP arr]
 		
-		frag.add(Label, deallocStart);                                // [arr returnPointer]
-		frag.add(Exchange);                                           // [returnPointer arr] -> Treat as [returnPointer arr] as [arr]
+		// If a null array is handled to dealloc, simple don't do anything and return
+		frag.add(Label, nullArray);                                             // [retP arr]
+		frag.add(Pop);                                                          // [retP]
+		frag.add(PopPC);                                                        // [] & returns to the end
 		
-		frag.add(Duplicate);
-		frag.add(JumpFalse, nullArray);
-		frag.add(Jump, notNullArray);
+		// If array is not null, check if we need to delete it
+		frag.add(Label, notNullArray);                                          // [retP arr]
+		frag.add(Duplicate);                                                    // [retP arr arr]
 		
-		frag.add(Label, nullArray);
+		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
+		frag.add(PushI, ASMConstants.STATUS_TO_CHECK_DELETE_OR_PERM);           // [retP arr status checkDelOrPerm]
+		frag.add(BTAnd);		                                                // [retP arr 0||!0]
+		frag.add(JumpTrue, doNotDeAllocAndClearUp);                              // [retP arr]
+
+		frag.add(Duplicate);                                                    // [retP arr arr]
+		frag.add(Duplicate);                                                    // [retP arr arr arr]
+		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr arr status]		
+		frag.add(PushI, ASMConstants.TURN_DELETE_BIT_1);                        // [retP arr arr status deleteBitChange]
+		frag.add(BTOr);		                                                    // [retP arr arr updatedStatus]
+		frag.add(Exchange);                                                     // [retP arr updatedStatus arr]
+		Macros.writeIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);      // [retP arr]
+
+		frag.add(Duplicate);	                                                // [retP arr arr]
+		Macros.readIOffset(frag, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);       // [retP arr status]
+		frag.add(PushI, ASMConstants.STATUS_FLAG_FOR_REFERENCE);                // [retP arr subTypeRef]
+		frag.add(BTAnd);                                                        // [retP arr 0||!0] -> if 1: array subtype, other not
+		
+		// If top of stack is 0: I do not need to recurse. I just dealloc this array
+		frag.add(JumpFalse, deallocateMe);                                      // [retP arr]
+
+		Macros.storeITo(frag, RunTime.ARRAY_INDEXING_ARRAY);                    // [retP]
+		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);                   // [retP arr]
+		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMConstants.ARRAY_LENGTH_OFFSET);        // [retP arr len]
+		Macros.readIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);  // [retP arr len subTypeSize] 
+		Macros.storeITo(frag, RunTime.ARRAY_SUBTYPE_SIZE);                      // [retP arr len]
+
+		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);                   // [retP arr len arr]
+		frag.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);                        // [retP arr len arr headerSize]
+		frag.add(Add);                                                          // [retP arr len baseForFirstElement]
+
+		// ------------ Start of loop --------------
+		// We can start recursing now
+		frag.add(Label, deallocLoopBegin);
+		frag.add(Exchange);		                                                // [retP arr baseForFirstElement len]
+		frag.add(Duplicate);                                                    // [retP arr baseForFirstElement len len]
+		// Check condition of while loop
+		frag.add(JumpFalse, deallocLoopEnd);                                           // [retP arr baseForFirstElement len]
+		// If not yet 0, decrement length
+		frag.add(PushI, 1);                                                     // [retP arr baseForFirstElement len 1]
+		frag.add(Subtract);		                                                // [retP arr baseForFirstElement len-1] --> Decreemented length
+		frag.add(Exchange);                                                     // [retP arr len baseForFirstElement]
+		frag.add(Duplicate);                                                    // [retP arr len baseForFirstElement baseForFirstElement]
+		Macros.loadIFrom(frag, RunTime.ARRAY_SUBTYPE_SIZE);                     // [retP arr len baseForFirstElement baseForFirstElement subTypeSize]
+		frag.add(Exchange);                                                     // [retP arr len baseForFirstElement subTypeSize baseForFirstElement]
+		frag.add(LoadI);                                                        // [retP oldData firstElementRecord]
+		frag.add(Call, deallocStart);		                                    // [retP oldData firstElementRecord otherRetP]
+		
+		// When it comes here: Stack : [retP arr len baseForFirstElement subTypeSize]
+		frag.add(Duplicate);                                                    // [retP arr len baseForFirstElement subTypeSize subTypeSize]
+		Macros.storeITo(frag, RunTime.ARRAY_SUBTYPE_SIZE);                      // [retP arr len baseForFirstElement subTypeSize]
+		frag.add(Add);                                                          // [retP arr len baseForNextElement]
+		frag.add(Jump, deallocLoopBegin);                                       // [retP arr len baseForNextElement]
+
+		frag.add(Label, deallocLoopEnd);                                        // [retP arr len baseForNextElement]
 		frag.add(Pop);
-		frag.add(PopPC);
+		frag.add(Pop);                                                          // [retP arr]
+
+		frag.add(Label, deallocateMe);                            
+		frag.add(Call, MemoryManager.MEM_MANAGER_DEALLOCATE);                   // [retP]
+		frag.add(Jump, coreEnd);                                                // [retP]
+
+		frag.add(Label, doNotDeAllocAndClearUp);	                            // [ret arr]
+		frag.add(Pop);                                                          // [ret]
 		
-		frag.add(Label, notNullArray);
-		frag.add(Duplicate);                                          // [arr arr]
-		Macros.readIOffset(frag, ASMConstants.RECORD_STATUS_OFFSET);        // [arrPointer status]
-		Macros.storeITo(frag, RunTime.ARRAY_STATUS_FLAGS);            // [arrPointer]
-		frag.add(Duplicate);                                          // [arrPointer arrPointer]
-		Macros.readIOffset(frag, ASMConstants.ARRAY_SUBTYPE_SIZE_OFFSET);   // [arrPointer subtypeSize]
-		Macros.storeITo(frag, RunTime.ARRAY_SUBTYPE_SIZE);            // [arrPointer]
-		frag.add(Duplicate);                                          // [arrPointer arrPointer]
-		Macros.readIOffset(frag, ASMConstants.ARRAY_LENGTH_OFFSET);         // [arrPointer length]
-		frag.add(Duplicate);                                          // [arrPointer length length]
-		Macros.storeITo(frag, RunTime.ARRAY_LENGTH);                  // [arrPointer length]
-		frag.add(JumpFalse, endLabel);                                // [arrPointer]
-		frag.add(PushI, ASMConstants.ARRAY_HEADER_SIZE);              
-		frag.add(Add);                                                // [baseForFirstElement]
+		// ------------ End Label ------------
+		frag.add(Label, coreEnd);                                               // [retP]
+		frag.add(Return);                                                       // []
 		
-		frag.add(Label, recursiveDealloc);
-		
-		// Now check if status said that elements are arrays
-		Macros.loadIFrom(frag, RunTime.ARRAY_STATUS_FLAGS);           // [baseForCurrentElement status]
-		frag.add(PushI, ASMConstants.STATUS_FLAG_FOR_REFERENCE);
-		frag.add(BTAnd);                                              // [baseForCurrentElement 0 or 1]
-		
-		// If 0 : it is not an array
-		frag.add(JumpFalse, doNotDeallocate);                         // [baseForCurrentElement]
-		// Else it is an array
-		// Now check if both is-deleted-bit and permanent-status bit are not 0
-		Macros.loadIFrom(frag, RunTime.ARRAY_STATUS_FLAGS);           // [baseForCurrentElement status]
-		frag.add(PushI, ASMConstants.STATUS_FLAG_FOR_DELETE_AND_PERM);      // [baseForCurrentElement 0b0011]
-		frag.add(BTOr);                                               // [base 1 or _]
-		frag.add(PushI, ASMConstants.BINARY_F);                             // [base 1/_ 1]
-		frag.add(Subtract);                                           // [base 0/_]
-		// if top is 0, both bits were not 0. Otherwise, perform dealloc
-		frag.add(JumpFalse, doNotDeallocate);                         // [base]
-		
-		// Put all current variables on stack and load new array's base pointer and call start
-		frag.add(Duplicate);                                          // [baseForCurrentElement baseForCurrentElement]
-		frag.add(LoadI); 
-		Macros.storeITo(frag, RunTime.ARRAY_INDEXING_ARRAY);          // [baseForCurrentElement]
-		Macros.loadIFrom(frag, RunTime.ARRAY_LENGTH);
-		Macros.loadIFrom(frag, RunTime.ARRAY_SUBTYPE_SIZE);
-		Macros.loadIFrom(frag, RunTime.ARRAY_STATUS_FLAGS);
-		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);
-//		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);
-		frag.add(Call, deallocStart);                                 // [OldData newArrayBase returnPointer]
-		
-		// When I will come here, I have deallocated inner array so old becomes current
-		Macros.storeITo(frag, RunTime.ARRAY_STATUS_FLAGS);            // [base length subtypeSize]
-		Macros.storeITo(frag, RunTime.ARRAY_SUBTYPE_SIZE);            // [base length]
-		Macros.storeITo(frag, RunTime.ARRAY_LENGTH);                  // [base]
-		frag.add(Jump, commonPart);
-		
-		// Label for doNotDeallocate
-		frag.add(Label, doNotDeallocate);                             // [base]
-		// No operation then
-		frag.add(Nop);                                                // [base]
-		
-		frag.add(Label, commonPart);
-		Macros.decrementInteger(frag, RunTime.ARRAY_LENGTH); 
-		Macros.loadIFrom(frag, RunTime.ARRAY_LENGTH);            // [baseForCurrentEl length]
-		frag.add(JumpFalse, endLabel);                           // [... baseForCurrentEl]
-		Macros.loadIFrom(frag, RunTime.ARRAY_SUBTYPE_SIZE);      // [... baseForCurrentEl subtypeSize]
-		frag.add(Add);                                           // [... baseFor(Current+1)El]
-		frag.add(Jump, recursiveDealloc);
-		
-		// End label
-		frag.add(Label, endLabel);                               // [... baseForCurrentEl]
-		frag.add(Pop);
-		
-		// Now on top, we have the pointer to the array's base which we want to deallocate
-		Macros.loadIFrom(frag, RunTime.ARRAY_STATUS_FLAGS);
-		frag.add(PushI, ASMConstants.TURN_DELETE_BIT_1);
-		frag.add(BTOr);
-		Macros.writeIPtrOffset(frag, RunTime.ARRAY_INDEXING_ARRAY, ASMConstants.ARRAY_STATUS_FLAGS_OFFSET);
-		
-		Macros.loadIFrom(frag, RunTime.ARRAY_INDEXING_ARRAY);
-		frag.add(Call, MemoryManager.MEM_MANAGER_DEALLOCATE);
-		frag.add(PopPC);
-		
-		frag.add(Label, firstCall);
-		frag.add(Call, deallocStart);
+		frag.add(Label, firstCall);                                             // [arr]
+		frag.add(Call, deallocStart);                                           // [arr retP]
 		
 		return frag;
 	}

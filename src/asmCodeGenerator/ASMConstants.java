@@ -13,6 +13,7 @@ public class ASMConstants {
 	public static final int STATUS_FLAG_FOR_REFERENCE = 0b0010;
 	public static final int STATUS_FLAG_FOR_NON_REFERENCE = 0;
 	public static final int STATUS_FLAG_FOR_DELETE_AND_PERM = 0b0011;
+	public static final int STATUS_TO_CHECK_DELETE_OR_PERM = 0b1100;
 	public static final int BINARY_F = 0b1111;
 	public static final int TURN_DELETE_BIT_1 = 0b0100;
 	

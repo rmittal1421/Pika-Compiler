@@ -95,6 +95,11 @@ public class Macros {
 		writeIOffset(frag, offset); // [...]
 	}
 	
+	public static void readIPtrOffset(ASMCodeFragment frag, String baseLocation, int offset) {
+		loadIFrom(frag, baseLocation);
+		readIOffset(frag, offset);
+	}
+	
 	public static void loadMakePositiveStore(ASMCodeFragment frag, String baseLocation) {
 		Labeller labeller = new Labeller("macro-make-positive");
 		String makePositive = labeller.newLabel("make-positive");

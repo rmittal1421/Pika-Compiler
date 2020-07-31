@@ -1,6 +1,6 @@
 package asmCodeGenerator.specialCodeGenerator;
 
-import asmCodeGenerator.DynamicRecordAllocation;
+import asmCodeGenerator.DynamicRecordCodeGenerator;
 import asmCodeGenerator.Macros;
 import asmCodeGenerator.ASMCodeGenerationConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
@@ -24,7 +24,7 @@ public class ArrayAllocationCodeGenerator implements SimpleCodeGenerator {
 		
 		// Stack currently: [nElems]
 		
-		DynamicRecordAllocation.createEmptyArrayRecord(frag, statusFlags, subtypeSize);
+		DynamicRecordCodeGenerator.createEmptyArrayRecord(frag, statusFlags, subtypeSize);
 		Macros.loadIFrom(frag, RunTime.RECORD_CREATION_TEMPORARY);
 		return frag;
 	}

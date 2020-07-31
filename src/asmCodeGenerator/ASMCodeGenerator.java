@@ -83,6 +83,7 @@ public class ASMCodeGenerator {
 		root.accept(visitor);
 		return visitor.removeRootCode(root);
 	}
+	
 
 	// Spits out fragment for storing a value
 	public static ASMCodeFragment opcodeForStore(Type type) {
@@ -601,12 +602,8 @@ public class ASMCodeGenerator {
 
 			}
 		}
-
-		public void visitLeave(KNaryOperatorNode node) {
-			// Handle visit for function call here (Since it is the only use of
-			// KNaryOperatorNode for now)
-			assert node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION);
-			
+		
+		public void handleFunctionInvocation(KNaryOperatorNode node) {
 			if(node.getType() instanceof NullType) {
 				newVoidCode(node);
 			} else {
@@ -645,6 +642,56 @@ public class ASMCodeGenerator {
 				code.add(PushI, sizeOfReturnValue);                           // [... SP returnValueSize]
 				code.add(Subtract);                                           // [... SP-returnValueSize(newSP)]
 				code.append(opcodeForLoad(returnType));                       // [... valueReturnedFromFunctionCall]
+			}
+		}
+
+		public void visitLeave(KNaryOperatorNode node) {
+			if(node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
+				handleFunctionInvocation(node);
+				return;
+			} 
+			
+			newValueCode(node);
+			
+			List<ASMCodeFragment> argList = new ArrayList<>();
+			for(ParseNode child: node.getChildren()) {
+				argList.add(removeValueCode(child));
+			}
+			
+			assert !node.getSignature().isNull();
+			Object variant = node.getSignature().getVariant();
+			
+			if(variant instanceof ASMOpcode) {
+				for(ASMCodeFragment childFrag: argList) {
+					code.append(childFrag);
+				}
+				
+				ASMOpcode opcode = (ASMOpcode) variant;
+				code.add(opcode);
+			} else if(variant instanceof SimpleCodeGenerator) {
+				for(ASMCodeFragment childFrag: argList) {
+					code.append(childFrag);
+				}
+				
+				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
+				ASMCodeFragment fragment = generator.generate(node);
+				code.append(fragment);
+				
+				if (fragment.isAddress()) {
+					// Which means that the fragment returns a pointer
+					code.markAsAddress(); // Now we know that this code is a pointer
+				}
+			} else if (variant instanceof FullCodeGenerator) {
+				FullCodeGenerator generator = (FullCodeGenerator) variant;
+				ASMCodeFragment fragment = generator.generate(node, argList.toArray(new ASMCodeFragment[argList.size()]));
+
+				code.append(fragment);
+
+				if (fragment.isAddress()) {
+					code.markAsAddress();
+				}
+			} else {
+				throw new UnsupportedOperationException("No ASMOpcode or fragment code matches the provided variant");
 			}
 		}
 
@@ -826,13 +873,15 @@ public class ASMCodeGenerator {
 
 		public void visit(StringConstantNode node) {
 			newValueCode(node);
-
-			Labeller labeller = new Labeller("string-constant");
-			String thisStringLabel = labeller.newLabel("");
-
-			code.add(DLabel, thisStringLabel);
-			code.add(DataS, node.getValue());
-			code.add(PushD, thisStringLabel);
+			
+			// Dynamically add the string record
+			String value = node.getValue();
+			int recordSize = ASMCodeGenerationConstants.STRING_HEADER_SIZE + PrimitiveType.CHARACTER.getSize() * value.length() + 1;
+			code.add(PushI, recordSize);
+			
+			// Stack: [... recordSize]
+			DynamicRecordCodeGenerator.createStringRecord(code, value);
+			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 		}
 
 		public void visitLeave(PopulatedArrayNode node) {
@@ -848,7 +897,7 @@ public class ASMCodeGenerator {
 			}
 			int recordSize = ASMCodeGenerationConstants.ARRAY_HEADER_SIZE + nElems * subtype.getSize();
 			code.add(PushI, recordSize); // [... recordSize] before calling to create a record
-			DynamicRecordAllocation.createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
+			DynamicRecordCodeGenerator.createPopulatedArrayRecord(code, statusFlags, subtype, codeForChildren);
 
 			// Place the created record's address on the stack
 			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);

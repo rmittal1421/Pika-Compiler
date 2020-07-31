@@ -44,7 +44,7 @@ public class PikaCodeGenerator extends PikaApplication {
 		
 		if(thereAreErrors()) {
 			stopProcessing(outfile);
-			System.exit(1);
+			System.exit(0);
 		} 
 		else {
 			generateAndPrintCode(outfile, decoratedTree);

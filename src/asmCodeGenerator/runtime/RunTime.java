@@ -37,7 +37,9 @@ public class RunTime {
 	
 	// Array static variables
 	public static final String ARRAY_INDEXING_ARRAY = "$a-indexing-array";
+	public static final String ARRAY_INDEXING_OTHER_ARRAY = "$a-indexing-other-array";
 	public static final String ARRAY_INDEXING_INDEX = "$a-indexing-index";
+	public static final String ARRAY_LATER_INDEXING_INDEX = "$a-later-indexing-index";
 	public static final String RECORD_CREATION_TEMPORARY = "$record-creation-temp";
 	public static final String ARRAY_DATASIZE_TEMPORARY = "$array-datasize-temporary";
 	public static final String ARRAY_STATUS_FLAGS = "$array-status-flags";
@@ -63,6 +65,7 @@ public class RunTime {
 	public static final String INDEX_OUT_OF_BOUNDS_RUNTIME_ERROR = "$$array-index-out-of-bound-error";
 	public static final String NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR = "$$array-length-negative";
 	public static final String NO_RETURN_IN_LAMBDA = "$$code-out-of-lambda-without-return";
+	public static final String LATER_INDEX_SMALLER_OR_EQUAL_RUNTIME_ERROR = "$$array-second-index-smaller-equal-error";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
@@ -151,6 +154,7 @@ public class RunTime {
 		rationalGotZeroDenominatorError(frag);
 		nullArrayIndexingError(frag);
 		arrayIndexOutOfBoundsError(frag);
+		arraySecondIndexSmallerEqualError(frag);
 		arrayLengthNegativeError(frag);
 		lambdaWithoutReturnError(frag);
 
@@ -173,7 +177,9 @@ public class RunTime {
 	private ASMCodeFragment temporaryVariables() {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
 		Macros.declareI(frag, ARRAY_INDEXING_ARRAY);
+		Macros.declareI(frag, ARRAY_INDEXING_OTHER_ARRAY);
 		Macros.declareI(frag, ARRAY_INDEXING_INDEX);
+		Macros.declareI(frag, ARRAY_LATER_INDEXING_INDEX);
 		Macros.declareI(frag, RECORD_CREATION_TEMPORARY);
 		Macros.declareI(frag, ARRAY_DATASIZE_TEMPORARY);
 		Macros.declareI(frag, ARRAY_SUBTYPE_SIZE);
@@ -442,10 +448,21 @@ public class RunTime {
 		String arrayIndexOutOfBoundsMessage = "$errors-array-index-out-of-bounds";
 
 		frag.add(DLabel, arrayIndexOutOfBoundsMessage);
-		frag.add(DataS, "Array index out of bounds");
+		frag.add(DataS, "Index out of bounds");
 
 		frag.add(Label, INDEX_OUT_OF_BOUNDS_RUNTIME_ERROR);
 		frag.add(PushD, arrayIndexOutOfBoundsMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	
+	private void arraySecondIndexSmallerEqualError(ASMCodeFragment frag) {
+		String arraySecondIndexSmallerEqualMessage = "$errors-array-second-index-smaller-equal";
+		
+		frag.add(DLabel, arraySecondIndexSmallerEqualMessage);
+		frag.add(DataS, "Second index smaller or equal to first one in substring");
+		
+		frag.add(Label, LATER_INDEX_SMALLER_OR_EQUAL_RUNTIME_ERROR);
+		frag.add(PushD, arraySecondIndexSmallerEqualMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 

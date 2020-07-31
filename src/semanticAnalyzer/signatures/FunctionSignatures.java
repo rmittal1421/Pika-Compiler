@@ -34,11 +34,17 @@ import asmCodeGenerator.specialCodeGenerator.RationalDivideCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalSubtractionCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CastFromRationalCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CastToRationalCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.CharStringConcatenationCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalExpressOverCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalMultiplicationCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalRationalizeCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.ShortCircuitAndCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.ShortCircuitOrCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.StringCharConcatenationCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.StringIndexingCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.StringLengthCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.StringStringConcatenationCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.StringSubstringCodeGenerator;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Punctuator;
 import semanticAnalyzer.types.Type;
@@ -112,7 +118,13 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 				new FunctionSignature(ASMOpcode.FAdd, PrimitiveType.FLOATING, PrimitiveType.FLOATING,
 						PrimitiveType.FLOATING),
 				new FunctionSignature(new RationalAdditionCodeGenerator(), PrimitiveType.RATIONAL, PrimitiveType.RATIONAL,
-						PrimitiveType.RATIONAL));
+						PrimitiveType.RATIONAL),
+				new FunctionSignature(new StringCharConcatenationCodeGenerator(), PrimitiveType.STRING, PrimitiveType.CHARACTER,
+						PrimitiveType.STRING),
+				new FunctionSignature(new CharStringConcatenationCodeGenerator(), PrimitiveType.CHARACTER, PrimitiveType.STRING,
+						PrimitiveType.STRING),
+				new FunctionSignature(new StringStringConcatenationCodeGenerator(), PrimitiveType.STRING, PrimitiveType.STRING,
+						PrimitiveType.STRING));
 		new FunctionSignatures(Punctuator.MULTIPLY,
 				new FunctionSignature(ASMOpcode.Multiply, PrimitiveType.INTEGER, PrimitiveType.INTEGER,
 						PrimitiveType.INTEGER),
@@ -196,10 +208,16 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 						PrimitiveType.BOOLEAN)
 				);
 		
+		// TODO: Make sure you undo assigning using array indexing for strings!
 		new FunctionSignatures(Punctuator.ARRAY_INDEXING, 
 				new FunctionSignature(
 					new ArrayIndexingCodeGenerator(), setS, new Array(S), PrimitiveType.INTEGER, S
-				));
+				),
+				new FunctionSignature(new StringIndexingCodeGenerator(), PrimitiveType.STRING, PrimitiveType.INTEGER, 
+						PrimitiveType.CHARACTER),
+				new FunctionSignature(new StringSubstringCodeGenerator(), PrimitiveType.STRING, PrimitiveType.INTEGER, PrimitiveType.INTEGER, 
+						PrimitiveType.STRING)
+				);
 
 		for (Punctuator comparison : Punctuator.ComparisonOperators) {
 			FunctionSignature iSignature = new FunctionSignature(1, PrimitiveType.INTEGER, PrimitiveType.INTEGER,
@@ -226,7 +244,8 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 		
 		// Signatures for unary operators
 		new FunctionSignatures(Keyword.LENGTH,
-				new FunctionSignature(new ArrayLengthCodeGenerator(), setS, new Array(S), PrimitiveType.INTEGER)
+				new FunctionSignature(new ArrayLengthCodeGenerator(), setS, new Array(S), PrimitiveType.INTEGER),
+				new FunctionSignature(new StringLengthCodeGenerator(), PrimitiveType.STRING, PrimitiveType.INTEGER)
 				);
 		new FunctionSignatures(Keyword.CLONE,
 				new FunctionSignature(new ArrayCloneCodeGenerator(), setS, new Array(S), new Array(S))

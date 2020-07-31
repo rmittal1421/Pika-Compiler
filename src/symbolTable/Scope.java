@@ -52,7 +52,7 @@ public class Scope {
 		return new NegativeMemoryAllocator(
 				MemoryAccessMethod.INDIRECT_ACCESS_BASE,
 				MemoryLocation.FRAME_POINTER,
-				ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);
+				-ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);
 	}
 	
 //////////////////////////////////////////////////////////////////////

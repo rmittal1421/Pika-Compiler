@@ -2,8 +2,7 @@ package asmCodeGenerator.specialCodeGenerator;
 
 import static asmCodeGenerator.codeStorage.ASMOpcode.*;
 
-import asmCodeGenerator.ASMCodeGenerator;
-import asmCodeGenerator.DynamicRecordAllocation;
+import asmCodeGenerator.DynamicRecordCodeGenerator;
 import asmCodeGenerator.Macros;
 import asmCodeGenerator.ASMCodeGenerationConstants;
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
@@ -38,6 +37,7 @@ public class ArrayCloneCodeGenerator implements SimpleCodeGenerator {
 		code.add(Duplicate);                                        // [... toBeClonedArrayPointer toBeClonedArrayPointer]
 		Macros.readIOffset(code, ASMCodeGenerationConstants.ARRAY_SUBTYPE_SIZE_OFFSET); // [... toBeClonedArrayPointer subtypeSizeOfToBeClonedArray]
 		Macros.storeITo(code, RunTime.ARRAY_SUBTYPE_SIZE);    // [... toBeClonedArrayPointer]
+//		code.add(Duplicate);                                        // [... toBeClonedArrayPointer]
 		Macros.readIOffset(code, ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET);       // [... lengthOfToBeClonedArray]
 		Macros.storeITo(code, RunTime.ARRAY_LENGTH);          // [...]
 		Macros.loadIFrom(code, RunTime.ARRAY_SUBTYPE_SIZE);   // [... subtypeSize]
@@ -50,7 +50,7 @@ public class ArrayCloneCodeGenerator implements SimpleCodeGenerator {
 		code.add(Add);                                              // [... numBytesToCopy totalRecordSize]
 		
 		// Need record size on top of stack which is the case
-		DynamicRecordAllocation.createRecord(code, typecode, 0);    // This stores a pointer to an array in RECORD_CREATION_TEMPORARY
+		DynamicRecordCodeGenerator.createRecord(code, typecode, 0);    // This stores a pointer to an array in RECORD_CREATION_TEMPORARY
 		
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);  // [... numBytesToCopy thisArrayPointer]
 		code.add(PushI, ASMCodeGenerationConstants.ARRAY_HEADER_SIZE);                  // [... numBytesToCopy thisArrayPointer headerSize]

@@ -651,11 +651,13 @@ public class Parser {
 		}
 		
 		ParseNode base = parseAtomicExpression();
-		if(isArrayIndexingExpression(nowReading)) {
-			return parseArrayIndexingExpression(base);
-		} else if(isFunctionInvocationExpression(nowReading)) {
-			return parseFunctionInvocationExpression(base);
-		} 
+		while(isArrayIndexingExpression(nowReading) || isFunctionInvocationExpression(nowReading)) {			
+			if(isArrayIndexingExpression(nowReading)) {
+				base = parseArrayIndexingExpression(base);
+			} else if(isFunctionInvocationExpression(nowReading)) {
+				base = parseFunctionInvocationExpression(base);
+			} 
+		}
 
 		return base;
 	}
@@ -682,9 +684,17 @@ public class Parser {
 			Token indexToken = LextantToken.artificial(realToken, Punctuator.ARRAY_INDEXING);
 			readToken();
 			ParseNode index = parseExpression();
-			expect(Punctuator.CLOSE_SQUARE_BRACKET);
-
-			base = BinaryOperatorNode.withChildren(indexToken, base, index);
+			
+			if(nowReading.isLextant(Punctuator.SEPARATOR)) {
+				// Substring alert!
+				readToken();
+				ParseNode laterIndex = parseExpression();
+				expect(Punctuator.CLOSE_SQUARE_BRACKET);
+				base = KNaryOperatorNode.withChildren(indexToken, base, index, laterIndex);
+			} else {
+				expect(Punctuator.CLOSE_SQUARE_BRACKET);
+				base = BinaryOperatorNode.withChildren(indexToken, base, index);
+			}
 		}
 
 		return base;
@@ -717,7 +727,8 @@ public class Parser {
 		
 		readToken();
 		
-		return KNaryOperatorNode.withChildren(invocationToken, children);
+		// TODO: Test this change
+		return KNaryOperatorNode.withChildren(invocationToken, children.toArray(new ParseNode[children.size()]));
 	}
 	
 	private boolean isFunctionInvocationExpression(Token token) {

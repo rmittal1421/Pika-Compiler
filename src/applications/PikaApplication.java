@@ -3,7 +3,7 @@ package applications;
 import java.io.File;
 
 public class PikaApplication {
-	private static final int EXIT_CODE_FOR_ERROR = 1;
+	private static final int EXIT_CODE_FOR_ERROR = 0;
 	private static String outputDirectory = "output/";
 
 	public PikaApplication() {
@@ -49,8 +49,8 @@ public class PikaApplication {
 		return (!filePath.endsWith(File.separator));
 	}
 	protected static String outputFilename(String filename) {
-		return outputDirectory + basename(filename) + ".asm";
-//		return outputDirectory + "pika-3" + ".asm";
+//		return outputDirectory + basename(filename) + ".asm";
+		return outputDirectory + "pika-4" + ".asm";
 	}
 	// removes preceding directory names and the file extension
 	// e.g. /usr/root/tricks/bigBag.cpp  ->  bigBag

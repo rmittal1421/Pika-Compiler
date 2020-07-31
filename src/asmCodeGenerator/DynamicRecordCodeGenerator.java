@@ -7,16 +7,17 @@ import static asmCodeGenerator.codeStorage.ASMOpcode.JumpNeg;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Multiply;
 import static asmCodeGenerator.codeStorage.ASMOpcode.Pop;
 import static asmCodeGenerator.codeStorage.ASMOpcode.PushI;
+import static asmCodeGenerator.codeStorage.ASMOpcode.StoreC;
 
 import java.util.List;
 
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
+import semanticAnalyzer.types.PrimitiveType;
 import semanticAnalyzer.types.Type;
 
-public class DynamicRecordAllocation {
-
+public class DynamicRecordCodeGenerator {
 	public static void createRecord(ASMCodeFragment code, int typecode, int statusFlags) {
 		code.add(Call, MemoryManager.MEM_MANAGER_ALLOCATE);
 		Macros.storeITo(code, RunTime.RECORD_CREATION_TEMPORARY);
@@ -97,5 +98,39 @@ public class DynamicRecordAllocation {
 				ASMCodeGenerationConstants.ARRAY_SUBTYPE_SIZE_OFFSET, subtypeSize);
 		Macros.writeIPBaseOffset(code, RunTime.RECORD_CREATION_TEMPORARY,
 				ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET, codeForChildren.size());
+	}
+	
+	// Stack: [... recordSize]
+	public static void createStringRecord(ASMCodeFragment code, String value) {
+		// Create record
+		createRecord(code, 
+					ASMCodeGenerationConstants.STRING_TYPE_ID, 
+					ASMCodeGenerationConstants.STATUS_FLAG_FOR_STRING);
+		
+		// Type id and status flags are set. Set length!
+		Macros.writeIPBaseOffset(code, 
+					RunTime.RECORD_CREATION_TEMPORARY, 
+					ASMCodeGenerationConstants.STRING_LENGTH_OFFSET, 
+					value.length());
+		
+		// Fill in characters
+//		Macros.readIPtrOffset(code, 
+//							RunTime.RECORD_CREATION_TEMPORARY, 
+//							ASMCodeGenerationConstants.STRING_HEADER_SIZE);
+		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
+		code.add(PushI, ASMCodeGenerationConstants.STRING_HEADER_SIZE);
+		code.add(Add);
+		
+		// Stack: [baseForFirstChar]
+		for(char ch : value.toCharArray()) {
+			code.add(Duplicate);                                  // [baseForChar baseForChar]
+			code.add(PushI, ch);                                  // [baseForChar baseForChar ch]
+			code.add(StoreC);                                     // [baseForChar] & MEM(baseForChar) <- ch
+			code.add(PushI, PrimitiveType.CHARACTER.getSize());   // [baseForChar 1]
+			code.add(Add);                                        // [baseForNextChar]
+		}
+		
+		code.add(PushI, 0);                                       // [baseForNullChar 0]
+		code.add(StoreC);                                         // []
 	}
 }

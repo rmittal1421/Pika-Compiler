@@ -130,7 +130,9 @@ public class PrintStatementGenerator {
 				code.add(Label, trueLabel);
 				code.add(PushD, RunTime.BOOLEAN_TRUE_STRING);
 				code.add(Label, boolEndLabel);
-
+			} else if(concreteType.equivalent(PrimitiveType.STRING)) {
+				code.add(PushI, ASMCodeGenerationConstants.STRING_HEADER_SIZE);
+				code.add(Add);
 			}
 			code.add(PushD, printFormat(concreteType));
 			code.add(Printf);                                        // [... baseForCurrentEl]
@@ -162,8 +164,18 @@ public class PrintStatementGenerator {
 
 		code.append(visitor.removeValueCode(node));
 		convertToStringIfBoolean(node);
+		convertToStringIfString(node);
 		code.add(PushD, format);
 		code.add(Printf);
+	}
+	
+	private void convertToStringIfString(ParseNode node) {
+		if(node.getType() != PrimitiveType.STRING) {
+			return;
+		}
+
+		code.add(PushI, ASMCodeGenerationConstants.STRING_HEADER_SIZE);
+		code.add(Add);
 	}
 	
 	private void convertToStringIfBoolean(ParseNode node) {

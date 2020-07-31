@@ -1,0 +1,27 @@
+exec {
+	const a := "raghav".
+	const b := "diksha mittal".
+	print a; b, _n_.
+	
+	const c := [a, b].
+	print c, _n_.
+	
+	print length a; length b, _n_.
+	
+	print a != b, _n_.
+	
+	print a[^a^ - 97], _n_.
+	
+	a[0] := ^b^.
+	print a, _n_.
+	
+	const e := a[0,4][0,2].
+	print e, _n_.
+	
+	const f := a + ^m^.
+	const g := ^m^ + f.
+	print f; g, _n_.
+	print length f; length g, _n_.
+	
+	print "" + "Raghav" + " Mittal".
+}

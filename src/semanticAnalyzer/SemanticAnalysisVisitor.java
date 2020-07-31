@@ -156,13 +156,13 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	@Override
 	public void visitLeave(ParameterSpecificationNode node) {
 		Type paramType = node.child(0).getType();
-		
-		if(!(node.child(1) instanceof IdentifierNode)) {
+
+		if (!(node.child(1) instanceof IdentifierNode)) {
 			parameterExpectedIdentifierError(node);
 			node.setType(PrimitiveType.ERROR);
 			return;
 		}
-		
+
 		IdentifierNode identifierNode = (IdentifierNode) node.child(1);
 		identifierNode.setType(paramType);
 		node.setType(paramType);
@@ -250,10 +250,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(TypeNode node) {
 		if (node.getToken().isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
 			node.setType(new Array(node.child(0).getType()));
-		} else if(node.getToken().isLextant(Punctuator.LESS)) {
+		} else if (node.getToken().isLextant(Punctuator.LESS)) {
 			// Lambda Type
 			ArrayList<Type> paramTypeList = new ArrayList<>();
-			for(int i = 0; i < node.nChildren() - 1; i++) {
+			for (int i = 0; i < node.nChildren() - 1; i++) {
 				paramTypeList.add(node.child(i).getType());
 			}
 			Type returnType = node.child(node.nChildren() - 1).getType();
@@ -303,8 +303,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		List<Type> childTypes = Arrays.asList(node.child(0).getType());
 		Lextant operator = operatorFor(node);
 
-		if (node.getToken().isLextant(Keyword.LENGTH, Keyword.CLONE, Keyword.DEALLOC)
-				&& !(childTypes.get(0) instanceof Array)) {
+		if (node.getToken().isLextant(Keyword.CLONE, Keyword.DEALLOC) && !(childTypes.get(0) instanceof Array)) {
+			typeCheckError(node, childTypes);
+			node.setType(PrimitiveType.ERROR);
+		} else if (node.getToken().isLextant(Keyword.LENGTH) && !(childTypes.get(0) instanceof Array
+				|| childTypes.get(0).getConcreteType().equivalent(PrimitiveType.STRING))) {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
 		} else if (node.getToken().isLextant(Punctuator.NOT)
@@ -345,38 +348,80 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	@Override
 	public void visitLeave(KNaryOperatorNode node) {
 		// As of now, KNaryOperatorNodes are used just for function invocations
-		assert node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION);
 		assert node.nChildren() > 0;
+				
+		if(node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
+			if (!(node.child(0).getType() instanceof Lambda)) {
+				notLambdaInvoked(node);
+				node.setType(PrimitiveType.ERROR);
+				return;
+			}
 
-		if (!(node.child(0).getType() instanceof Lambda)) {
-			notLambdaInvoked(node);
-			node.setType(PrimitiveType.ERROR);
-			return;
-		}
+			Lambda lambdaType = (Lambda) node.child(0).getType();
 
-		Lambda lambdaType = (Lambda) node.child(0).getType();
+			// Check types of params against the children types
+			List<Type> paramTypes = new ArrayList<>();
+			for (int i = 1; i < node.nChildren(); i++) {
+				paramTypes.add(node.child(i).getType());
+			}
 
-		// Check types of params against the children types
-		List<Type> paramTypes = new ArrayList<>();
-		for (int i = 1; i < node.nChildren(); i++) {
-			paramTypes.add(node.child(i).getType());
-		}
+			if (lambdaType.equivalentParams(paramTypes)) {
+				/*
+				 * Two cases: 1. If return type is null and not called by 'call' -> error node
+				 * 2. All other cases
+				 */
 
-		if (lambdaType.equivalentParams(paramTypes)) {
-			/*
-			 * Two cases: 1. If return type is null and not called by 'call' -> error node
-			 * 2. All other cases
-			 */
-
-			Type returnType = lambdaType.getReturnType();
-			if (!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
-				funcReturnNullUsedAsAssignment(node);
+				Type returnType = lambdaType.getReturnType();
+				if (!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
+					funcReturnNullUsedAsAssignment(node);
+					node.setType(PrimitiveType.ERROR);
+				}
+				node.setType(lambdaType.getReturnType());
+			} else {
+				// error
+				typeCheckError(node, paramTypes);
 				node.setType(PrimitiveType.ERROR);
 			}
-			node.setType(lambdaType.getReturnType());
+			
+		} else if(node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+			// Array indexing not considered as binary if it is substring operation.
+			if(!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
+				substringOnNotStringType(node);
+				node.setType(PrimitiveType.ERROR);
+				return;
+			}
+			
+			assert node.nChildren() == 3;
+			ParseNode base = node.child(0);
+			ParseNode firstIndex = node.child(1);
+			ParseNode secondIndex = node.child(2);
+			
+			List<Type> childTypes = Arrays.asList(base.getType(), firstIndex.getType(), secondIndex.getType());
+			
+			Lextant operator = ((LextantToken) (node.getToken())).getLextant();
+			FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
+			FunctionSignature signature = signatures.acceptingSignature(childTypes);
+
+			if (signature.accepts(childTypes)) {
+				node.setType(signature.resultType());
+				node.setSignature(signature);
+			} else {
+				// Try promoting and check again
+				signature = findSuitableSignature(node, signatures, childTypes);
+				if (signature.accepts(childTypes)) {
+					node.setType(signature.resultType());
+					node.setSignature(signature);
+				} else {
+					typeCheckError(node, childTypes);
+					node.setType(PrimitiveType.ERROR);
+				}
+			}
 		} else {
-			// error
-			typeCheckError(node, paramTypes);
+			List<Type> childTypes = new ArrayList<>();
+			for(ParseNode child: node.getChildren()) {
+				childTypes.add(child.getType());
+			}
+			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
 		}
 	}
@@ -502,7 +547,6 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		} else {
 			// Try promoting and check again
 			signature = findSuitableSignature(node, signatures, childTypes);
-//			if(!signature.isNull()) {
 			if (signature.accepts(childTypes)) {
 				node.setType(signature.resultType());
 				node.setSignature(signature);
@@ -569,7 +613,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingWhileEndLabel(((WhileStatementNode) immParent).getEndLabel());
 				return;
-			} else if(immParent instanceof LambdaNode) {
+			} else if (immParent instanceof LambdaNode) {
 				break;
 			}
 		}
@@ -585,7 +629,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingWhileStartLabel(((WhileStatementNode) immParent).getStartLabel());
 				return;
-			} else if(immParent instanceof LambdaNode) {
+			} else if (immParent instanceof LambdaNode) {
 				break;
 			}
 		}
@@ -760,9 +804,15 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		logError("Trying to invoke function on non-lambda type at " + token.getLocation());
 	}
 	
-	private void parameterExpectedIdentifierError(ParseNode node) {
+	private void substringOnNotStringType(ParseNode node) {
 		Token token = node.getToken();
 		
+		logError("Trying to get a substring of non-string type at " + token.getLocation());
+	}
+
+	private void parameterExpectedIdentifierError(ParseNode node) {
+		Token token = node.getToken();
+
 		logError("ParameterSpecification expected identifier node after type at " + token.getLocation());
 	}
 

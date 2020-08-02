@@ -1,0 +1,24 @@
+exec {
+	#const i := 0.
+	const arr := [1//2, 2//2, 3//2].
+	
+	for index i of arr {
+		print arr[i];.
+	#	var j := arr[i].
+	}
+	print _n_.
+	
+	#for index i of arr {
+	#	print "Iteration : ", i, _n_.
+	#	for index j of arr {
+	#		print _t_, "Inner iteration : ", j, ", value is : ", arr[j], _n_.
+	#	}
+	#}
+	
+	for elem i of arr {
+		print "Iteration on element : ", i, _n_.
+		for elem j of arr {
+			print _t_, "Inner iteration on element : ", j, _n_.
+		}
+	}
+}

@@ -28,4 +28,7 @@ public class ASMCodeGenerationConstants {
 	public static final int STRING_HEADER_SIZE = 12;
 	public static final int STRING_STATUS_FLAGS_OFFSET = 4;
 	public static final int STRING_LENGTH_OFFSET = 8;
+	
+	// For loop constants
+	public static final int FOR_STARTING_INDEX = 0;
 }

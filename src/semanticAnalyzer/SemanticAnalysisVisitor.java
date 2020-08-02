@@ -81,13 +81,15 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		if (node.getParent() instanceof LambdaNode) {
 			enterProcedureScope(node);
 			return;
+		} else if(!(node.getParent() instanceof ForStatementNode)) {			
+			enterSubscope(node);
 		}
-
-		enterSubscope(node);
 	}
 
 	public void visitLeave(BlockStatementNode node) {
-		leaveScope(node);
+		if(!(node.getParent() instanceof ForStatementNode)) {			
+			leaveScope(node);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -292,6 +294,22 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 		if (!node.child(0).getType().equivalent(PrimitiveType.BOOLEAN)) {
 			typeCheckErrorForControlFlow(node);
+		}
+	}
+	
+	@Override
+	public void visitEnter(ForStatementNode node) {
+		enterSubscope(node);
+	}
+	
+	@Override
+	public void visitLeave(ForStatementNode node) {
+		leaveScope(node);
+		
+		// Type of sequence should have been determined by now.
+		if(!(node.getSequenceType() instanceof Array || node.getSequenceType().equivalent(PrimitiveType.STRING))) {
+			forLoopForNonRecordTypeError(node);
+			node.setType(PrimitiveType.ERROR);
 		}
 	}
 
@@ -712,7 +730,37 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	// IdentifierNodes, with helper methods
 	@Override
 	public void visit(IdentifierNode node) {
-		if (!isBeingDeclared(node) && !isUsedAsFunctionParameter(node)) {
+		if (isUsedAsForLoopIdentifier(node)) {
+			ForStatementNode parent = (ForStatementNode) node.getParent();
+			Token forLoopToken = parent.getToken();
+			LextantToken constIdentifierToken = (LextantToken) LextantToken.artificial(forLoopToken, Keyword.CONST);
+			
+			if(parent.forTypeLextantToken().isLextant(Keyword.INDEX)) {
+				
+				// Index should be assigned type int
+				Type identifierType = PrimitiveType.INTEGER;
+				node.setType(identifierType);
+				
+				// Add binding for identifier in for loop body's scope
+				addBinding(node, identifierType, constIdentifierToken.getLextant());
+				
+			} else if(parent.forTypeLextantToken().isLextant(Keyword.ELEM)) {
+				
+				// For element, it should be either character or subType of sequence
+				if(parent.getSequenceType().equivalent(PrimitiveType.STRING)) {
+					node.setType(PrimitiveType.CHARACTER);
+				} else {
+					Array arrayType = (Array) parent.getSequenceType();
+					node.setType(arrayType.getSubtype());
+				}
+				
+				addBinding(node, node.getType(), constIdentifierToken.getLextant());
+				
+			} else {
+				throw new RuntimeException("Lextant of type neither index or elem in class: " + node.getClass());
+			}
+		}
+		else if (!isBeingDeclared(node) && !isUsedAsFunctionParameter(node)) {
 			Binding binding = node.findVariableBinding();
 
 			node.setType(binding.getType());
@@ -729,6 +777,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	private boolean isUsedAsFunctionParameter(IdentifierNode node) {
 		ParseNode parent = node.getParent();
 		return (parent instanceof ParameterSpecificationNode);
+	}
+	
+	private boolean isUsedAsForLoopIdentifier(IdentifierNode node) {
+		ParseNode parent = node.getParent();
+		return (parent instanceof ForStatementNode) && (node == parent.child(1));
 	}
 
 	private void addBinding(IdentifierNode identifierNode, Type type, Lextant declareLextant) {
@@ -814,6 +867,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("ParameterSpecification expected identifier node after type at " + token.getLocation());
+	}
+	
+	private void forLoopForNonRecordTypeError(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("For loop expected expression of record type to loop on at " + token.getLocation());
 	}
 
 	private void logError(String message) {

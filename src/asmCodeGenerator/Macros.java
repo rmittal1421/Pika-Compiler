@@ -51,6 +51,15 @@ public class Macros {
 		frag.add(Add);				// [base+off]
 		frag.add(LoadC);			// [*(base+off)]
 	}
+	/** [...] -> [... readInt]
+	 * 	@param frag ASMCodeFragment to add code to
+	 *  @param baseLocation BaseLocation of the record
+	 *  @param offset The offset from base address where to read the readInt from
+	 */
+	public static void readIPtrOffset(ASMCodeFragment frag, String baseLocation, int offset) {
+		loadIFrom(frag, baseLocation);
+		readIOffset(frag, offset);
+	}
 	/** [... intToWrite baseLocation] -> [...]
 	 * @param frag ASMCodeFragment to add code to
 	 * @param offset amount to add to the base location before writing 
@@ -93,11 +102,6 @@ public class Macros {
 	public static void writeIPtrOffset(ASMCodeFragment frag, String baseLocation, int offset) {
 		loadIFrom(frag, baseLocation); // [... intToWrite baseLocation]
 		writeIOffset(frag, offset); // [...]
-	}
-	
-	public static void readIPtrOffset(ASMCodeFragment frag, String baseLocation, int offset) {
-		loadIFrom(frag, baseLocation);
-		readIOffset(frag, offset);
 	}
 	
 	public static void loadMakePositiveStore(ASMCodeFragment frag, String baseLocation) {

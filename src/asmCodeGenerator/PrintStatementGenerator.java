@@ -229,8 +229,7 @@ public class PrintStatementGenerator {
 		code.add(Duplicate);                             // [... num num]
 		code.add(JumpFalse, numIsZero);                  // [... num]
 		
-		code.add(Duplicate);                             // [... num num]
-		code.add(JumpPos, signHandled);                  // [... num]
+		code.add(JumpPos, signHandled);                  // [...]
 		code.add(PushD, RunTime.NEGATIVE_SIGN_STRING);   
 		code.add(Printf);                                // [...]
 		code.add(Jump, signHandled);

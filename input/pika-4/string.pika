@@ -23,5 +23,10 @@ exec {
 	print f; g, _n_.
 	print length f; length g, _n_.
 	
-	print "" + "Raghav" + " Mittal".
+	print "" + "Raghav" + " Mittal", _n_.
+	
+	const h := ["Raghav & Akansha"].
+	const i := h[0].
+	dealloc h.
+	print i, _n_.
 }

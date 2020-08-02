@@ -532,6 +532,170 @@ public class ASMCodeGenerator {
 			code.add(Label, falseAndEndLabel);
 		}
 		
+		public void visitLeave(ForStatementNode node) {
+			newVoidCode(node);
+			
+			if(node.forTypeLextantToken().isLextant(Keyword.INDEX)) {
+				handleForLoopOnIndex(node);
+			} else {
+				handleForLoopOnElem(node);
+			}
+		}
+		
+		private void handleForLoopOnIndex(ForStatementNode node) {
+			
+			// Constants required:
+			int lengthOffset = node.getSequenceType() instanceof Array 
+								? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET 
+								: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
+			
+			String startLabel = node.getStartLabel();
+			String readyForNextIterationLabel = node.getReadyForNextIterationLabel();
+			String endLabel = node.getEndLabel();
+			
+			// Get child code
+			ASMCodeFragment sequence = removeAddressCode(node.child(0));
+			ASMCodeFragment identifier = removeAddressCode(node.child(1));
+			ASMCodeFragment forBlock = removeVoidCode(node.child(2));
+			
+			// TODO: Check for null array
+			
+			// Get variables to be used throughout the loop ready
+			// Stack: []
+			code.add(PushI, ASMCodeGenerationConstants.FOR_STARTING_INDEX);
+			Macros.storeITo(code, RunTime.FOR_INDEX);                       // Compiler index set to 0
+			
+			code.append(identifier);
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER);                   // Address of identifier used ready
+			
+			code.append(sequence);
+			code.add(LoadI);
+			Macros.readIOffset(code, lengthOffset);
+			Macros.storeITo(code, RunTime.FOR_LENGTH);                      // Length of the array stored 
+
+			// Start loop: with stack []
+			code.add(Label, startLabel);
+			
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH);                     // [len] 
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [len index]
+			code.add(Subtract);                                             // [len-index]
+			code.add(JumpFalse, endLabel);                                  // []
+			
+			// Continue the loop other wise
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);                  // [addOfIdentifier]
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [addOfIdentifier index]
+			code.add(StoreI);                                               // []
+			
+			// Unload variables on stack to avoid getting overwritten
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH);
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);
+			
+			// Ready to run the body
+//			code.add(PStack);
+			code.append(forBlock);
+//			code.add(PStack);
+			
+			code.add(Label, readyForNextIterationLabel);
+			
+			// Load back the original values after body is complete
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER);
+			Macros.storeITo(code, RunTime.FOR_INDEX);
+			Macros.storeITo(code, RunTime.FOR_LENGTH);
+			
+			// Comes here after running the block with empty stack.
+			Macros.incrementInteger(code, RunTime.FOR_INDEX);
+			code.add(Jump, startLabel);
+			
+			// End loop with stack []
+			code.add(Label, endLabel);
+		}
+		
+		private void handleForLoopOnElem(ForStatementNode node) {
+			
+			// Constants required:
+			boolean sequenceIsArray = node.getSequenceType() instanceof Array; 
+			int lengthOffset =  sequenceIsArray
+								? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET 
+								: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
+			int headerOffset = sequenceIsArray
+								? ASMCodeGenerationConstants.ARRAY_HEADER_SIZE 
+								: ASMCodeGenerationConstants.STRING_HEADER_SIZE;
+			
+			Type subType = sequenceIsArray ? ((Array) node.getSequenceType()).getSubtype() : PrimitiveType.CHARACTER;
+			int subTypeSize = subType.getSize();
+			
+			String startLabel = node.getStartLabel();
+			String readyForNextIterationLabel = node.getReadyForNextIterationLabel();
+			String endLabel = node.getEndLabel();
+			
+			// Get child code
+			ASMCodeFragment sequence = removeAddressCode(node.child(0));
+			ASMCodeFragment identifier = removeAddressCode(node.child(1));
+			ASMCodeFragment forBlock = removeVoidCode(node.child(2));
+			
+			// Get variables to be used throughout the loop ready
+			// Stack: []
+			code.add(PushI, ASMCodeGenerationConstants.FOR_STARTING_INDEX);
+			Macros.storeITo(code, RunTime.FOR_INDEX);                       // Compiler index set to 0
+			
+			code.append(identifier);
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER);                   // Address of identifier used ready
+			
+			code.append(sequence);
+			code.add(LoadI);
+			code.add(Duplicate);
+			
+			code.add(PushI, headerOffset);
+			code.add(Add);
+			Macros.storeITo(code, RunTime.FOR_SEQUENCE);                    // Base address of first el stored
+			
+			Macros.readIOffset(code, lengthOffset);
+			Macros.storeITo(code, RunTime.FOR_LENGTH);                      // Length of the array stored
+			
+			// Start loop: with stack []
+			code.add(Label, startLabel);
+			
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH);                     // [len] 
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [len index]
+			code.add(Subtract);                                             // [len-index]
+			code.add(JumpFalse, endLabel);                                  // []
+			
+			// Continue the loop other wise
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);                  // [addOfIdentifier]
+			Macros.loadIFrom(code, RunTime.FOR_SEQUENCE);                   // [addOfIdentifier baseForFirstEl]
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);
+			code.add(PushI, subTypeSize);
+			code.add(Multiply);
+			code.add(Add);
+			code.append(opcodeForLoad(subType));
+			code.append(opcodeForStore(subType));
+			
+			// Unload variables on stack to avoid getting overwritten
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH);
+			Macros.loadIFrom(code, RunTime.FOR_INDEX);
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);
+			Macros.loadIFrom(code, RunTime.FOR_SEQUENCE);
+			
+			// Ready to run the body
+			code.append(forBlock);
+			
+			code.add(Label, readyForNextIterationLabel);
+			
+			// Load back the original values after body is complete
+			Macros.storeITo(code, RunTime.FOR_SEQUENCE);
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER);
+			Macros.storeITo(code, RunTime.FOR_INDEX);
+			Macros.storeITo(code, RunTime.FOR_LENGTH);
+			
+			// Comes here after running the block with empty stack.
+			Macros.incrementInteger(code, RunTime.FOR_INDEX);
+			code.add(Jump, startLabel);
+			
+			// End loop with stack []
+			code.add(Label, endLabel);
+		}
+		
 		public void visit(BreakNode node) {
 			newVoidCode(node);
 			

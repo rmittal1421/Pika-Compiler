@@ -55,6 +55,12 @@ public class RunTime {
 	public static final String RATIONAL_GCD = "$rational-gcd";
 	public static final String EXPRESS_OVER_DEN = "$express-over-den";
 	public static final String RATIONAL_DEN_2_TEMP = "$rational-den-2-temp";
+	
+	// For loop static variables
+	public static final String FOR_IDENTIFER = "$for-identifier";
+	public static final String FOR_INDEX = "$for-index";
+	public static final String FOR_SEQUENCE = "$for-sequence";
+	public static final String FOR_LENGTH = "$for-length";
 
 	// Runtime errors static variables
 	public static final String GENERAL_RUNTIME_ERROR = "$$general-runtime-error";
@@ -189,6 +195,10 @@ public class RunTime {
 		Macros.declareI(frag, EXPRESS_OVER_DEN);
 		Macros.declareI(frag, RATIONAL_DEN_2_TEMP);
 		Macros.declareI(frag, RETURN_PC);
+		Macros.declareI(frag, FOR_IDENTIFER);
+		Macros.declareI(frag, FOR_INDEX);
+		Macros.declareI(frag, FOR_SEQUENCE);
+		Macros.declareI(frag, FOR_LENGTH);
 		return frag;
 	}
 

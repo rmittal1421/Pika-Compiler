@@ -51,6 +51,9 @@ public interface ParseNodeVisitor {
 	void visitEnter(WhileStatementNode node);
 	void visitLeave(WhileStatementNode node);
 	
+	void visitEnter(ForStatementNode node);
+	void visitLeave(ForStatementNode node);
+	
 	void visitEnter(PopulatedArrayNode node);
 	void visitLeave(PopulatedArrayNode node);
 	
@@ -131,6 +134,12 @@ public interface ParseNodeVisitor {
 			defaultVisitEnter(node);
 		}
 		public void visitLeave(WhileStatementNode node) {
+			defaultVisitLeave(node);
+		}
+		public void visitEnter(ForStatementNode node) {
+			defaultVisitEnter(node);
+		}
+		public void visitLeave(ForStatementNode node) {
 			defaultVisitLeave(node);
 		}
 		public void visitEnter(ParseNode node) {

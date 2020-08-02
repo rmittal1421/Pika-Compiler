@@ -176,6 +176,9 @@ public class Parser {
 		if (startsWhileStatement(nowReading)) {
 			return parseWhileStatement();
 		}
+		if (startsForStatement(nowReading)) {
+			return parseForStatement();
+		}
 		if (startsDeallocStatement(nowReading)) {
 			return parseDeallocStatement();
 		}
@@ -197,7 +200,7 @@ public class Parser {
 	private boolean startsStatement(Token token) {
 		return startsPrintStatement(token) || startsDeclaration(token) || startsBlockStatement(token) || startsAssignmentStatement(token) 
 				|| startsIfStatement(token) || startsWhileStatement(token) || startsDeallocStatement(token) || startsCallStatement(token)
-				|| startsReturnStatement(token) || startsBreakStatement(token) || startsContinueStatement(token);
+				|| startsReturnStatement(token) || startsBreakStatement(token) || startsContinueStatement(token) || startsForStatement(token);
 	}
 
 	// assignmentStatement -> target := expr .
@@ -392,6 +395,31 @@ public class Parser {
 
 	private boolean startsWhileStatement(Token token) {
 		return token.isLextant(Keyword.WHILE);
+	}
+	
+	private ParseNode parseForStatement() {
+		if(!startsForStatement(nowReading)) {
+			return syntaxErrorNode("for statement");
+		}
+		
+		Token forToken = nowReading;
+		readToken();
+		
+		expect(Keyword.INDEX, Keyword.ELEM);
+		Token forTypeToken = previouslyRead;
+		
+		ParseNode identifier = parseIdentifier();
+		
+		expect(Keyword.OF);
+		
+		ParseNode sequence = parseExpression();
+		ParseNode forBlock = parseBlockStatement();
+		
+		return ForStatementNode.withChildren(forToken, forTypeToken, sequence, identifier, forBlock);
+	}
+	
+	private boolean startsForStatement(Token token) {
+		return token.isLextant(Keyword.FOR);
 	}
 	
 	private ParseNode parseDeallocStatement() {

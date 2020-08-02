@@ -26,6 +26,10 @@ public enum Keyword implements Lextant {
 	RETURN("return"),
 	BREAK("break"),
 	CONTINUE("continue"),
+	FOR("for"),
+	INDEX("index"),
+	ELEM("elem"),
+	OF("of"),
 	
 	// Types
 	BOOL("bool"),

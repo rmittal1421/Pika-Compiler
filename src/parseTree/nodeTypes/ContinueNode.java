@@ -1,6 +1,5 @@
 package parseTree.nodeTypes;
 
-import asmCodeGenerator.Labeller;
 import parseTree.ParseNode;
 import parseTree.ParseNodeVisitor;
 import tokens.LextantToken;
@@ -8,7 +7,7 @@ import tokens.Token;
 
 public class ContinueNode extends ParseNode {
 	
-	private String enclosingWhileStartLabel;
+	private String enclosingLoopStartLabel;
 
 	public ContinueNode(ParseNode node) {
 		super(node);
@@ -17,12 +16,12 @@ public class ContinueNode extends ParseNode {
 		super(token);
 	}
 	
-	public void setEnclosingWhileStartLabel(String label) {
-		this.enclosingWhileStartLabel = label;
+	public void setEnclosingLoopStartLabel(String label) {
+		this.enclosingLoopStartLabel = label;
 	}
 	
-	public String getEnclosingWhileStartLabel() {
-		return this.enclosingWhileStartLabel;
+	public String getEnclosingLoopStartLabel() {
+		return this.enclosingLoopStartLabel;
 	}
 	
 	public LextantToken lextantToken() {

@@ -592,9 +592,7 @@ public class ASMCodeGenerator {
 			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);
 			
 			// Ready to run the body
-//			code.add(PStack);
 			code.append(forBlock);
-//			code.add(PStack);
 			
 			code.add(Label, readyForNextIterationLabel);
 			
@@ -699,13 +697,13 @@ public class ASMCodeGenerator {
 		public void visit(BreakNode node) {
 			newVoidCode(node);
 			
-			code.add(Jump, node.getEnclosingWhileEndLabel());
+			code.add(Jump, node.getEnclosingLoopEndLabel());
 		}
 		
 		public void visit(ContinueNode node) {
 			newVoidCode(node);
 			
-			code.add(Jump, node.getEnclosingWhileStartLabel());
+			code.add(Jump, node.getEnclosingLoopStartLabel());
 		}
 		
 		public void visitLeave(ReturnNode node) {

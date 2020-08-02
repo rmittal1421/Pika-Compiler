@@ -8,7 +8,7 @@ import tokens.Token;
 
 public class BreakNode extends ParseNode {
 	
-	private String enclosingWhileEndLabel;
+	private String enclosingLoopEndLabel;
 
 	public BreakNode(ParseNode node) {
 		super(node);
@@ -17,12 +17,12 @@ public class BreakNode extends ParseNode {
 		super(token);
 	}
 	
-	public void setEnclosingWhileEndLabel(String label) {
-		this.enclosingWhileEndLabel = label;
+	public void setEnclosingLoopEndLabel(String label) {
+		this.enclosingLoopEndLabel = label;
 	}
 	
-	public String getEnclosingWhileEndLabel() {
-		return this.enclosingWhileEndLabel;
+	public String getEnclosingLoopEndLabel() {
+		return this.enclosingLoopEndLabel;
 	}
 	
 	public LextantToken lextantToken() {

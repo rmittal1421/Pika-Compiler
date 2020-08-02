@@ -2,23 +2,44 @@ exec {
 	#const i := 0.
 	const arr := [1//2, 2//2, 3//2].
 	
+	print "Simple looping test:", _n_.
 	for index i of arr {
 		print arr[i];.
 	#	var j := arr[i].
 	}
+	print _n_, _n_.
+	
+	print "Nested loop using index test:", _n_.
+	for index i of arr {
+		print "Iteration : ", i, _n_.
+		for index j of arr {
+			print _t_, "Inner iteration : ", j, ", value is : ", arr[j], _n_.
+		}
+	}
 	print _n_.
 	
-	#for index i of arr {
-	#	print "Iteration : ", i, _n_.
-	#	for index j of arr {
-	#		print _t_, "Inner iteration : ", j, ", value is : ", arr[j], _n_.
-	#	}
-	#}
-	
+	print "Nested loop using elem test:", _n_.
 	for elem i of arr {
 		print "Iteration on element : ", i, _n_.
 		for elem j of arr {
 			print _t_, "Inner iteration on element : ", j, _n_.
 		}
 	}
+	print _n_.
+	
+	print "Loop using break statement test:", _n_.
+	for index i of arr {
+		if(i == 1) { break. }
+		
+		print arr[i];.
+	}
+	print _n_, _n_.
+	
+	print "Loop using continue statement test:", _n_.
+	for index i of arr {
+		if(i == 1) { continue. }
+		
+		print arr[i];.
+	}
+	print _n_, _n_.
 }

@@ -81,13 +81,13 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		if (node.getParent() instanceof LambdaNode) {
 			enterProcedureScope(node);
 			return;
-		} else if(!(node.getParent() instanceof ForStatementNode)) {			
+		} else if (!(node.getParent() instanceof ForStatementNode)) {
 			enterSubscope(node);
 		}
 	}
 
 	public void visitLeave(BlockStatementNode node) {
-		if(!(node.getParent() instanceof ForStatementNode)) {			
+		if (!(node.getParent() instanceof ForStatementNode)) {
 			leaveScope(node);
 		}
 	}
@@ -296,18 +296,18 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			typeCheckErrorForControlFlow(node);
 		}
 	}
-	
+
 	@Override
 	public void visitEnter(ForStatementNode node) {
 		enterSubscope(node);
 	}
-	
+
 	@Override
 	public void visitLeave(ForStatementNode node) {
 		leaveScope(node);
-		
+
 		// Type of sequence should have been determined by now.
-		if(!(node.getSequenceType() instanceof Array || node.getSequenceType().equivalent(PrimitiveType.STRING))) {
+		if (!(node.getSequenceType() instanceof Array || node.getSequenceType().equivalent(PrimitiveType.STRING))) {
 			forLoopForNonRecordTypeError(node);
 			node.setType(PrimitiveType.ERROR);
 		}
@@ -367,8 +367,8 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	public void visitLeave(KNaryOperatorNode node) {
 		// As of now, KNaryOperatorNodes are used just for function invocations
 		assert node.nChildren() > 0;
-				
-		if(node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
+
+		if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
 			if (!(node.child(0).getType() instanceof Lambda)) {
 				notLambdaInvoked(node);
 				node.setType(PrimitiveType.ERROR);
@@ -400,22 +400,22 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 				typeCheckError(node, paramTypes);
 				node.setType(PrimitiveType.ERROR);
 			}
-			
-		} else if(node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+
+		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
 			// Array indexing not considered as binary if it is substring operation.
-			if(!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
+			if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
 				substringOnNotStringType(node);
 				node.setType(PrimitiveType.ERROR);
 				return;
 			}
-			
+
 			assert node.nChildren() == 3;
 			ParseNode base = node.child(0);
 			ParseNode firstIndex = node.child(1);
 			ParseNode secondIndex = node.child(2);
-			
+
 			List<Type> childTypes = Arrays.asList(base.getType(), firstIndex.getType(), secondIndex.getType());
-			
+
 			Lextant operator = ((LextantToken) (node.getToken())).getLextant();
 			FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
 			FunctionSignature signature = signatures.acceptingSignature(childTypes);
@@ -436,7 +436,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			}
 		} else {
 			List<Type> childTypes = new ArrayList<>();
-			for(ParseNode child: node.getChildren()) {
+			for (ParseNode child : node.getChildren()) {
 				childTypes.add(child.getType());
 			}
 			typeCheckError(node, childTypes);
@@ -629,7 +629,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		for (ParseNode immParent : node.pathToRoot()) {
 
 			if (immParent instanceof WhileStatementNode) {
-				node.setEnclosingWhileEndLabel(((WhileStatementNode) immParent).getEndLabel());
+				node.setEnclosingLoopEndLabel(((WhileStatementNode) immParent).getEndLabel());
+				return;
+			} else if(immParent instanceof ForStatementNode) {
+				node.setEnclosingLoopEndLabel(((ForStatementNode) immParent).getEndLabel());
 				return;
 			} else if (immParent instanceof LambdaNode) {
 				break;
@@ -645,7 +648,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		for (ParseNode immParent : node.pathToRoot()) {
 
 			if (immParent instanceof WhileStatementNode) {
-				node.setEnclosingWhileStartLabel(((WhileStatementNode) immParent).getStartLabel());
+				node.setEnclosingLoopStartLabel(((WhileStatementNode) immParent).getStartLabel());
+				return;
+			} else if(immParent instanceof ForStatementNode) {
+				node.setEnclosingLoopStartLabel(((ForStatementNode) immParent).getReadyForNextIterationLabel());
 				return;
 			} else if (immParent instanceof LambdaNode) {
 				break;
@@ -734,33 +740,32 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			ForStatementNode parent = (ForStatementNode) node.getParent();
 			Token forLoopToken = parent.getToken();
 			LextantToken constIdentifierToken = (LextantToken) LextantToken.artificial(forLoopToken, Keyword.CONST);
-			
-			if(parent.forTypeLextantToken().isLextant(Keyword.INDEX)) {
-				
+
+			if (parent.forTypeLextantToken().isLextant(Keyword.INDEX)) {
+
 				// Index should be assigned type int
 				Type identifierType = PrimitiveType.INTEGER;
 				node.setType(identifierType);
-				
+
 				// Add binding for identifier in for loop body's scope
 				addBinding(node, identifierType, constIdentifierToken.getLextant());
-				
-			} else if(parent.forTypeLextantToken().isLextant(Keyword.ELEM)) {
-				
+
+			} else if (parent.forTypeLextantToken().isLextant(Keyword.ELEM)) {
+
 				// For element, it should be either character or subType of sequence
-				if(parent.getSequenceType().equivalent(PrimitiveType.STRING)) {
+				if (parent.getSequenceType().equivalent(PrimitiveType.STRING)) {
 					node.setType(PrimitiveType.CHARACTER);
 				} else {
 					Array arrayType = (Array) parent.getSequenceType();
 					node.setType(arrayType.getSubtype());
 				}
-				
+
 				addBinding(node, node.getType(), constIdentifierToken.getLextant());
-				
+
 			} else {
 				throw new RuntimeException("Lextant of type neither index or elem in class: " + node.getClass());
 			}
-		}
-		else if (!isBeingDeclared(node) && !isUsedAsFunctionParameter(node)) {
+		} else if (!isBeingDeclared(node) && !isUsedAsFunctionParameter(node)) {
 			Binding binding = node.findVariableBinding();
 
 			node.setType(binding.getType());
@@ -778,7 +783,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		ParseNode parent = node.getParent();
 		return (parent instanceof ParameterSpecificationNode);
 	}
-	
+
 	private boolean isUsedAsForLoopIdentifier(IdentifierNode node) {
 		ParseNode parent = node.getParent();
 		return (parent instanceof ForStatementNode) && (node == parent.child(1));
@@ -842,13 +847,13 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	private void breakStatementNotInLoop(ParseNode node) {
 		Token token = node.getToken();
 
-		logError("Break sttement found outside of loop at " + token.getLocation());
+		logError("Break statement found outside of loop at " + token.getLocation());
 	}
 
 	private void continueStatementNotInLoop(ParseNode node) {
 		Token token = node.getToken();
 
-		logError("continue sttement found outside of loop at " + token.getLocation());
+		logError("continue statement found outside of loop at " + token.getLocation());
 	}
 
 	private void notLambdaInvoked(ParseNode node) {
@@ -856,10 +861,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 		logError("Trying to invoke function on non-lambda type at " + token.getLocation());
 	}
-	
+
 	private void substringOnNotStringType(ParseNode node) {
 		Token token = node.getToken();
-		
+
 		logError("Trying to get a substring of non-string type at " + token.getLocation());
 	}
 
@@ -868,10 +873,10 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 		logError("ParameterSpecification expected identifier node after type at " + token.getLocation());
 	}
-	
+
 	private void forLoopForNonRecordTypeError(ParseNode node) {
 		Token token = node.getToken();
-		
+
 		logError("For loop expected expression of record type to loop on at " + token.getLocation());
 	}
 

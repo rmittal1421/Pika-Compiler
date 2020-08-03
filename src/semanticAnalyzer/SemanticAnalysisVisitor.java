@@ -362,7 +362,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		LextantToken token = (LextantToken) node.getToken();
 		return token.getLextant();
 	}
-	
+
 	private void visitLeaveForFunctionInvocation(KNaryOperatorNode node) {
 		if (!(node.child(0).getType() instanceof Lambda)) {
 			notLambdaInvoked(node);
@@ -396,7 +396,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			node.setType(PrimitiveType.ERROR);
 		}
 	}
-	
+
 	private void visitLeaveForSubstringArrayIndexing(KNaryOperatorNode node) {
 		// Array indexing not considered as binary if it is substring operation.
 		if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
@@ -431,48 +431,95 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			}
 		}
 	}
-	
+
 	private void visitLeaveForMapOperator(KNaryOperatorNode node) {
 		assert node.nChildren() == 2;
 		assert node.getToken().isLextant(Keyword.MAP);
-		
+
 		List<Type> childTypes = new ArrayList<>();
 		childTypes.add(node.child(0).getType());
 		childTypes.add(node.child(1).getType());
-		
-		if(childTypes.get(0) instanceof Array && childTypes.get(1) instanceof Lambda) {
+
+		if (childTypes.get(0) instanceof Array && childTypes.get(1) instanceof Lambda) {
 
 			Lambda lambdaType = (Lambda) childTypes.get(1);
-			
-			if(lambdaType.getNumberOfParameters() == 1) {
-				
+
+			if (lambdaType.getNumberOfParameters() == 1) {
+
 				Type lambdaParamType = lambdaType.getParamTypes().get(0);
 				Type subTypeOfArray = ((Array) childTypes.get(0)).getSubtype();
-				
-				if(lambdaParamType.equivalent(subTypeOfArray)) {
-					
-					// Semantically, this is a correct map operation
-					node.setType(new Array(lambdaType.getReturnType()));
-					return;
-					
+
+				if (lambdaParamType.equivalent(subTypeOfArray)) {
+
+					if (!(lambdaType.getReturnType() instanceof NullType)) {
+
+						// Semantically, this is a correct map operation
+						node.setType(new Array(lambdaType.getReturnType()));
+						return;
+
+					} else {
+						MapLambdaReturnTypeNullError(node);
+					}
+
 				} else {
 					MapLambdaParamTypeMismatchArraySubTypeError(node);
 				}
-				
+
 			} else {
 				MapLambdaNumberOfParametersError(node);
 			}
-			
+
 		} else {
 			typeCheckError(node, childTypes);
 		}
-		
+
 		node.setType(PrimitiveType.ERROR);
 		return;
 	}
-	
+
 	private void visitLeaveForReduceOperator(KNaryOperatorNode node) {
-		
+		assert node.nChildren() == 2;
+		assert node.getToken().isLextant(Keyword.REDUCE);
+
+		List<Type> childTypes = new ArrayList<>();
+		childTypes.add(node.child(0).getType());
+		childTypes.add(node.child(1).getType());
+
+		if (childTypes.get(0) instanceof Array && childTypes.get(1) instanceof Lambda) {
+
+			Lambda lambdaType = (Lambda) childTypes.get(1);
+
+			if (lambdaType.getNumberOfParameters() == 1) {
+
+				Type lambdaParamType = lambdaType.getParamTypes().get(0);
+				Type subTypeOfArray = ((Array) childTypes.get(0)).getSubtype();
+
+				if (lambdaParamType.equivalent(subTypeOfArray)) {
+
+					if (lambdaType.getReturnType().equivalent(PrimitiveType.BOOLEAN)) {
+
+						// Semantically, this is a correct map operation
+						node.setType(new Array(subTypeOfArray));
+						return;
+
+					} else {
+						ReduceLambdaReturnTypeNotBooleanError(node);
+					}
+
+				} else {
+					ReduceLambdaParamTypeMismatchArraySubTypeError(node);
+				}
+
+			} else {
+				ReduceLambdaNumberOfParametersError(node);
+			}
+
+		} else {
+			typeCheckError(node, childTypes);
+		}
+
+		node.setType(PrimitiveType.ERROR);
+		return;
 	}
 
 	@Override
@@ -684,7 +731,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingLoopEndLabel(((WhileStatementNode) immParent).getEndLabel());
 				return;
-			} else if(immParent instanceof ForStatementNode) {
+			} else if (immParent instanceof ForStatementNode) {
 				node.setEnclosingLoopEndLabel(((ForStatementNode) immParent).getEndLabel());
 				return;
 			} else if (immParent instanceof LambdaNode) {
@@ -703,7 +750,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			if (immParent instanceof WhileStatementNode) {
 				node.setEnclosingLoopStartLabel(((WhileStatementNode) immParent).getStartLabel());
 				return;
-			} else if(immParent instanceof ForStatementNode) {
+			} else if (immParent instanceof ForStatementNode) {
 				node.setEnclosingLoopStartLabel(((ForStatementNode) immParent).getReadyForNextIterationLabel());
 				return;
 			} else if (immParent instanceof LambdaNode) {
@@ -932,17 +979,43 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 		logError("For loop expected expression of record type to loop on at " + token.getLocation());
 	}
-	
+
 	private void MapLambdaNumberOfParametersError(ParseNode node) {
 		Token token = node.getToken();
-		
+
 		logError("Map operator expression expects a lambda with exactly one parameter at " + token.getLocation());
 	}
-	
+
 	private void MapLambdaParamTypeMismatchArraySubTypeError(ParseNode node) {
 		Token token = node.getToken();
-		
-		logError("Map operator expression expects lambda's param type to be equal to array subtype at " + token.getLocation());
+
+		logError("Map operator expression expects lambda's param type to be equal to array subtype at "
+				+ token.getLocation());
+	}
+	
+	private void MapLambdaReturnTypeNullError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Map operator expression expects lambda's return type to not null at " + token.getLocation());
+	}
+
+	private void ReduceLambdaNumberOfParametersError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Reduce operator expression expects a lambda with exactly one parameter at " + token.getLocation());
+	}
+
+	private void ReduceLambdaParamTypeMismatchArraySubTypeError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Reduce operator expression expects lambda's param type to be equal to array subtype at "
+				+ token.getLocation());
+	}
+
+	private void ReduceLambdaReturnTypeNotBooleanError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Reduce operator expression expects lambda's return type to be boolean at " + token.getLocation());
 	}
 
 	private void logError(String message) {

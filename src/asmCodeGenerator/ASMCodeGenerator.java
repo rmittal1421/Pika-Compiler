@@ -10,6 +10,7 @@ import asmCodeGenerator.codeStorage.ASMOpcode;
 import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
 import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.MapOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
@@ -83,12 +84,12 @@ public class ASMCodeGenerator {
 		root.accept(visitor);
 		return visitor.removeRootCode(root);
 	}
-	
 
 	// Spits out fragment for storing a value
 	public static ASMCodeFragment opcodeForStore(Type type) {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array || type instanceof Lambda) {
+		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array
+				|| type instanceof Lambda) {
 			frag.add(StoreI);
 		} else if (type == PrimitiveType.FLOATING) {
 			frag.add(StoreF);
@@ -113,7 +114,8 @@ public class ASMCodeGenerator {
 
 	public static ASMCodeFragment opcodeForLoad(Type type) {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array || type instanceof Lambda) {
+		if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array
+				|| type instanceof Lambda) {
 			frag.add(LoadI);
 		} else if (type == PrimitiveType.FLOATING) {
 			frag.add(LoadF);
@@ -221,7 +223,7 @@ public class ASMCodeGenerator {
 			}
 			code.markAsValue();
 		}
-		
+
 		private ASMCodeFragment opcodeForStore(Type type) {
 			ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
 			if (type == PrimitiveType.INTEGER || type == PrimitiveType.STRING || type instanceof Array
@@ -300,144 +302,151 @@ public class ASMCodeGenerator {
 
 		public void visitLeave(LambdaNode node) {
 			newValueCode(node);
-			
+
 			String startLabel = node.getStartLabel();
 			String endLabel = node.getEndLabel();
 			String returnLabel = node.getReturnLabel();
-			
+
 			/*
-			 * Taking the approach of directly jumping over function code without letting anyone who has not called function run the code
+			 * Taking the approach of directly jumping over function code without letting
+			 * anyone who has not called function run the code
 			 */
 			code.add(Jump, endLabel);
-			
+
 			code.add(Label, startLabel);
-			
+
 			/*
 			 * Stack while starting the function call: [... returnAddress]
 			 * 
-			 * Steps to follow:
-			 * 1. Store information of old frame pointer and return address in memory
-			 * 2. Set frame pointer to be equal to stack pointer (Make sure stack pointer location is not changed as it was before function call)
-			 * 3. Subtract the size of lambda's body from stack pointer (which includes the additional bytes added above)
-			 * 4. Merge the code of the body of this lambda and hence, it will run (scoping has been taken care of)
-			 * 5. Within the body, if the code reaches return statement, the visitLeave for returnNode sends it to returnLabel.
-			 * 	  Otherwise, runtime error
-			 * 6. At returnLabel, the return value must be at top of stack
-			 * 		- Push the return address from memory (FramePointer - 8) on top of stack
-			 * 		- Update frame pointer with the address stored at FramePointer - 4
-			 * 		- Push exchange instruction which brings returned value on top of stack
-			 * 		- Increase stack pointer to it's old value by adding (sizeOfFuncFrame + Additional bytes required)
-			 * 		- Decrease the stack pointer by size of returned value and place the top of stack's value at SP.
-			 * 7. After this, we should have return address on top of stack where we want to go back from where the function was called. (Push Return).
+			 * Steps to follow: 1. Store information of old frame pointer and return address
+			 * in memory 2. Set frame pointer to be equal to stack pointer (Make sure stack
+			 * pointer location is not changed as it was before function call) 3. Subtract
+			 * the size of lambda's body from stack pointer (which includes the additional
+			 * bytes added above) 4. Merge the code of the body of this lambda and hence, it
+			 * will run (scoping has been taken care of) 5. Within the body, if the code
+			 * reaches return statement, the visitLeave for returnNode sends it to
+			 * returnLabel. Otherwise, runtime error 6. At returnLabel, the return value
+			 * must be at top of stack - Push the return address from memory (FramePointer -
+			 * 8) on top of stack - Update frame pointer with the address stored at
+			 * FramePointer - 4 - Push exchange instruction which brings returned value on
+			 * top of stack - Increase stack pointer to it's old value by adding
+			 * (sizeOfFuncFrame + Additional bytes required) - Decrease the stack pointer by
+			 * size of returned value and place the top of stack's value at SP. 7. After
+			 * this, we should have return address on top of stack where we want to go back
+			 * from where the function was called. (Push Return).
 			 */
-			
+
 			// Step 1.
-			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... returnAddress SP]
-			code.add(Duplicate);                                                              // [... returnAddress SP SP]
-			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE);                                 // [... returnAddress SP SP 4]
-			code.add(Subtract);                                                               // [... returnAddress SP SP-4]
-			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                    // [... returnAddress SP SP-4 FP]
-			code.add(StoreI);                                                                 // [... returnAddress SP]
-			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);                          // [... returnAddress SP 8]
-			code.add(Subtract);                                                               // [... returnAddress SP-8]
-			code.add(Exchange);                                                               // [... SP-8 returnAddress]
-			code.add(StoreI);                                                                 // [...] and old FP and returnAddress are in memory now
-			
+			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... returnAddress SP]
+			code.add(Duplicate); // [... returnAddress SP SP]
+			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE); // [... returnAddress SP SP 4]
+			code.add(Subtract); // [... returnAddress SP SP-4]
+			Macros.loadIFrom(code, RunTime.FRAME_POINTER); // [... returnAddress SP SP-4 FP]
+			code.add(StoreI); // [... returnAddress SP]
+			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES); // [... returnAddress SP 8]
+			code.add(Subtract); // [... returnAddress SP-8]
+			code.add(Exchange); // [... SP-8 returnAddress]
+			code.add(StoreI); // [...] and old FP and returnAddress are in memory now
+
 			// Step 2.
-			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... SP]
-			Macros.storeITo(code, RunTime.FRAME_POINTER);                                     // [...] and now FP == SP
-			
+			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
+			Macros.storeITo(code, RunTime.FRAME_POINTER); // [...] and now FP == SP
+
 			// Step 3.
-			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                    // [... SP]
-			int functionOverallSize = ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES + node.child(node.nChildren() - 1).getScope().getAllocatedSize();
-			code.add(PushI, functionOverallSize);                                             // [... SP sizeOfFunctionCall]
-			code.add(Subtract);                                                               // [... newSP]
-			Macros.storeITo(code, RunTime.STACK_POINTER);                                     // [...]
-			
+			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
+			int functionOverallSize = ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES
+					+ node.child(node.nChildren() - 1).getScope().getAllocatedSize();
+			code.add(PushI, functionOverallSize); // [... SP sizeOfFunctionCall]
+			code.add(Subtract); // [... newSP]
+			Macros.storeITo(code, RunTime.STACK_POINTER); // [...]
+
 			// Step 4.
 			code.append(removeVoidCode(node.child(node.nChildren() - 1)));
-			
+
 			// Step 5.
-			// RunTime error if comes here (which means that code took a path which was not followed by a return statement in the body)
+			// RunTime error if comes here (which means that code took a path which was not
+			// followed by a return statement in the body)
 			code.add(Jump, RunTime.NO_RETURN_IN_LAMBDA);
-			
+
 			// Code should reach here if there was a valid return statement
 			code.add(Label, returnLabel);
-			
-			// Step 6.                                                                         // [... returnedValue]
+
+			// Step 6. // [... returnedValue]
 			// 6.1
-			Macros.loadIFrom(code, RunTime.FRAME_POINTER);                                     // [... returnedValue FP]
-			code.add(Duplicate);                                                               // [... returnedValue FP FP]
-			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES);                           // [... returnedValue FP FP 8]
-			code.add(Subtract);                                                                // [... returnedValue FP FP-8]
-			code.add(LoadI);                                                                   // [... returnedValue FP whereToReturnAddr]
-			code.add(Exchange);                                                                // [... returnedValue whereToReturnAddr FP]
-			
+			Macros.loadIFrom(code, RunTime.FRAME_POINTER); // [... returnedValue FP]
+			code.add(Duplicate); // [... returnedValue FP FP]
+			code.add(PushI, ASMCodeGenerationConstants.FUNCTION_CALL_EXTRA_BYTES); // [... returnedValue FP FP 8]
+			code.add(Subtract); // [... returnedValue FP FP-8]
+			code.add(LoadI); // [... returnedValue FP whereToReturnAddr]
+			code.add(Exchange); // [... returnedValue whereToReturnAddr FP]
+
 			// 6.2
-			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE);                                  // [... returnedValue whereToReturnAddr FP 4]
-			code.add(Subtract);                                                                // [... returnedValue whereToReturnAddr FP-4]
-			code.add(LoadI);                                                                   // [... returnedValue whereToReturnAddr oldFramePointer]
-			Macros.storeITo(code, RunTime.FRAME_POINTER);                                      // [... returnedValue whereToReturnAddr]
-			
+			code.add(PushI, ASMCodeGenerationConstants.FRAME_POINTER_SIZE); // [... returnedValue whereToReturnAddr FP
+																			// 4]
+			code.add(Subtract); // [... returnedValue whereToReturnAddr FP-4]
+			code.add(LoadI); // [... returnedValue whereToReturnAddr oldFramePointer]
+			Macros.storeITo(code, RunTime.FRAME_POINTER); // [... returnedValue whereToReturnAddr]
+
 			// 6.3
-			flipValueAndAddress(node.getReturnType());                                         // [... whereToReturnAddr returnedValue]
-			
+			flipValueAndAddress(node.getReturnType()); // [... whereToReturnAddr returnedValue]
+
 			// 6.4
-			Macros.loadIFrom(code, RunTime.STACK_POINTER);                                     // [... whereToReturnAddr returnedValue SP]
-			
+			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... whereToReturnAddr returnedValue SP]
+
 			int parameterScopeSize = node.getScope().getAllocatedSize();
-			code.add(PushI, functionOverallSize + parameterScopeSize);                         // [... whereToReturnAddr returnedValue SP funcSize+paramScopeSize]
-			code.add(Add);                                                                     // [... whereToReturnAddr returnedValue SP+sizeToUpgrade]
-			code.add(Duplicate);                                                               // [... whereToReturnAddr returnedValue newSP newSP]
-			Macros.storeITo(code, RunTime.STACK_POINTER);                                      // [... whereToReturnAddr returnedValue newSP]
-			
+			code.add(PushI, functionOverallSize + parameterScopeSize); // [... whereToReturnAddr returnedValue SP
+																		// funcSize+paramScopeSize]
+			code.add(Add); // [... whereToReturnAddr returnedValue SP+sizeToUpgrade]
+			code.add(Duplicate); // [... whereToReturnAddr returnedValue newSP newSP]
+			Macros.storeITo(code, RunTime.STACK_POINTER); // [... whereToReturnAddr returnedValue newSP]
+
 			// 6.5
-			code.add(PushI, node.getReturnType().getSize());                                   // [... whereToReturnAddr returnedValue newSP returnTypeSize]
-			code.add(Subtract);                                                                // [... whereToReturnAddr returnedValue newSP-returnTypeSize]
+			code.add(PushI, node.getReturnType().getSize()); // [... whereToReturnAddr returnedValue newSP
+																// returnTypeSize]
+			code.add(Subtract); // [... whereToReturnAddr returnedValue newSP-returnTypeSize]
 			placeReturnedValue(node.getReturnType());
-			
+
 			// Step 7
-			code.add(Return);                                                                  // [... whereToReturnAddr] -> [...]
-			
+			code.add(Return); // [... whereToReturnAddr] -> [...]
+
 			// ------------ End of function --------------
-			
+
 			// Code should come directly here if function's code was not called
 			code.add(Label, endLabel);
-			
+
 			// Marking the location of the code for the function
 			code.add(PushD, startLabel);
 		}
-		
+
 		private void flipValueAndAddress(Type returnType) {
 			/*
-			 * This assumes you have a situation like this:
-			 * Stack : [... value address] and you want to switch them
+			 * This assumes you have a situation like this: Stack : [... value address] and
+			 * you want to switch them
 			 * 
-			 * Two cases:
-			 * If rational, exchange twice
-			 * Else, exchange once
+			 * Two cases: If rational, exchange twice Else, exchange once
 			 */
-			
-			if(!(returnType instanceof NullType)) {
-				code.add(Exchange);                                                            // [... address value]
+
+			if (!(returnType instanceof NullType)) {
+				code.add(Exchange); // [... address value]
 			}
-			
-			// If returnType was rational, stack must be like this: [... numerator address denominator]
-			if(returnType == PrimitiveType.RATIONAL) {
-				Macros.storeITo(code, RunTime.RATIONAL_DEN);                                   // [... numerator address]
-				code.add(Exchange);                                                            // [... address numerator]
-				Macros.loadIFrom(code, RunTime.RATIONAL_DEN);                                  // [... address value]
+
+			// If returnType was rational, stack must be like this: [... numerator address
+			// denominator]
+			if (returnType == PrimitiveType.RATIONAL) {
+				Macros.storeITo(code, RunTime.RATIONAL_DEN); // [... numerator address]
+				code.add(Exchange); // [... address numerator]
+				Macros.loadIFrom(code, RunTime.RATIONAL_DEN); // [... address value]
 			}
 		}
-		
+
 		private void placeReturnedValue(Type returnType) {
 			// Stack: [... whereToReturnAddr returnedValue newSP-returnTypeSize]
-			if(returnType instanceof NullType) {
-				code.add(Pop);                                                                 // [... whereToReturnAddr] (Should be no returned value in null case)
+			if (returnType instanceof NullType) {
+				code.add(Pop); // [... whereToReturnAddr] (Should be no returned value in null case)
 			} else {
 				// Stack should be : [... whereToReturnAddress value SP]
-				flipValueAndAddress(returnType);                                               // [... whereToReturnAddr SP value]
-				code.append(opcodeForStore(returnType));                                       // [... whereToReturnAddr]
+				flipValueAndAddress(returnType); // [... whereToReturnAddr SP value]
+				code.append(opcodeForStore(returnType)); // [... whereToReturnAddr]
 			}
 		}
 
@@ -531,191 +540,188 @@ public class ASMCodeGenerator {
 
 			code.add(Label, falseAndEndLabel);
 		}
-		
+
 		public void visitLeave(ForStatementNode node) {
 			newVoidCode(node);
-			
-			if(node.forTypeLextantToken().isLextant(Keyword.INDEX)) {
+
+			if (node.forTypeLextantToken().isLextant(Keyword.INDEX)) {
 				handleForLoopOnIndex(node);
 			} else {
 				handleForLoopOnElem(node);
 			}
 		}
-		
+
 		private void handleForLoopOnIndex(ForStatementNode node) {
-			
+
 			// Constants required:
-			int lengthOffset = node.getSequenceType() instanceof Array 
-								? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET 
-								: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
-			
+			int lengthOffset = node.getSequenceType() instanceof Array ? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET
+					: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
+
 			String startLabel = node.getStartLabel();
 			String readyForNextIterationLabel = node.getReadyForNextIterationLabel();
 			String endLabel = node.getEndLabel();
-			
+
 			// Get child code
 			ASMCodeFragment sequence = removeAddressCode(node.child(0));
 			ASMCodeFragment identifier = removeAddressCode(node.child(1));
 			ASMCodeFragment forBlock = removeVoidCode(node.child(2));
-			
+
 			// TODO: Check for null array
-			
+
 			// Get variables to be used throughout the loop ready
 			// Stack: []
 			code.add(PushI, ASMCodeGenerationConstants.FOR_STARTING_INDEX);
-			Macros.storeITo(code, RunTime.FOR_INDEX);                       // Compiler index set to 0
-			
+			Macros.storeITo(code, RunTime.FOR_INDEX); // Compiler index set to 0
+
 			code.append(identifier);
-			Macros.storeITo(code, RunTime.FOR_IDENTIFER);                   // Address of identifier used ready
-			
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER); // Address of identifier used ready
+
 			code.append(sequence);
 			code.add(LoadI);
 			Macros.readIOffset(code, lengthOffset);
-			Macros.storeITo(code, RunTime.FOR_LENGTH);                      // Length of the array stored 
+			Macros.storeITo(code, RunTime.FOR_LENGTH); // Length of the array stored
 
 			// Start loop: with stack []
 			code.add(Label, startLabel);
-			
-			Macros.loadIFrom(code, RunTime.FOR_LENGTH);                     // [len] 
-			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [len index]
-			code.add(Subtract);                                             // [len-index]
-			code.add(JumpFalse, endLabel);                                  // []
-			
+
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH); // [len]
+			Macros.loadIFrom(code, RunTime.FOR_INDEX); // [len index]
+			code.add(Subtract); // [len-index]
+			code.add(JumpFalse, endLabel); // []
+
 			// Continue the loop other wise
-			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);                  // [addOfIdentifier]
-			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [addOfIdentifier index]
-			code.add(StoreI);                                               // []
-			
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER); // [addOfIdentifier]
+			Macros.loadIFrom(code, RunTime.FOR_INDEX); // [addOfIdentifier index]
+			code.add(StoreI); // []
+
 			// Unload variables on stack to avoid getting overwritten
 			Macros.loadIFrom(code, RunTime.FOR_LENGTH);
 			Macros.loadIFrom(code, RunTime.FOR_INDEX);
 			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);
-			
+
 			// Ready to run the body
 			code.append(forBlock);
-			
+
 			code.add(Label, readyForNextIterationLabel);
-			
+
 			// Load back the original values after body is complete
 			Macros.storeITo(code, RunTime.FOR_IDENTIFER);
 			Macros.storeITo(code, RunTime.FOR_INDEX);
 			Macros.storeITo(code, RunTime.FOR_LENGTH);
-			
+
 			// Comes here after running the block with empty stack.
 			Macros.incrementInteger(code, RunTime.FOR_INDEX);
 			code.add(Jump, startLabel);
-			
+
 			// End loop with stack []
 			code.add(Label, endLabel);
 		}
-		
+
 		private void handleForLoopOnElem(ForStatementNode node) {
-			
+
 			// Constants required:
-			boolean sequenceIsArray = node.getSequenceType() instanceof Array; 
-			int lengthOffset =  sequenceIsArray
-								? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET 
-								: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
-			int headerOffset = sequenceIsArray
-								? ASMCodeGenerationConstants.ARRAY_HEADER_SIZE 
-								: ASMCodeGenerationConstants.STRING_HEADER_SIZE;
-			
+			boolean sequenceIsArray = node.getSequenceType() instanceof Array;
+			int lengthOffset = sequenceIsArray ? ASMCodeGenerationConstants.ARRAY_LENGTH_OFFSET
+					: ASMCodeGenerationConstants.STRING_LENGTH_OFFSET;
+			int headerOffset = sequenceIsArray ? ASMCodeGenerationConstants.ARRAY_HEADER_SIZE
+					: ASMCodeGenerationConstants.STRING_HEADER_SIZE;
+
 			Type subType = sequenceIsArray ? ((Array) node.getSequenceType()).getSubtype() : PrimitiveType.CHARACTER;
 			int subTypeSize = subType.getSize();
-			
+
 			String startLabel = node.getStartLabel();
 			String readyForNextIterationLabel = node.getReadyForNextIterationLabel();
 			String endLabel = node.getEndLabel();
-			
+
 			// Get child code
 			ASMCodeFragment sequence = removeAddressCode(node.child(0));
 			ASMCodeFragment identifier = removeAddressCode(node.child(1));
 			ASMCodeFragment forBlock = removeVoidCode(node.child(2));
-			
+
 			// Get variables to be used throughout the loop ready
 			// Stack: []
 			code.add(PushI, ASMCodeGenerationConstants.FOR_STARTING_INDEX);
-			Macros.storeITo(code, RunTime.FOR_INDEX);                       // Compiler index set to 0
-			
+			Macros.storeITo(code, RunTime.FOR_INDEX); // Compiler index set to 0
+
 			code.append(identifier);
-			Macros.storeITo(code, RunTime.FOR_IDENTIFER);                   // Address of identifier used ready
-			
+			Macros.storeITo(code, RunTime.FOR_IDENTIFER); // Address of identifier used ready
+
 			code.append(sequence);
 			code.add(LoadI);
 			code.add(Duplicate);
-			
+
 			code.add(PushI, headerOffset);
 			code.add(Add);
-			Macros.storeITo(code, RunTime.FOR_SEQUENCE);                    // Base address of first el stored
-			
+			Macros.storeITo(code, RunTime.FOR_SEQUENCE); // Base address of first el stored
+
 			Macros.readIOffset(code, lengthOffset);
-			Macros.storeITo(code, RunTime.FOR_LENGTH);                      // Length of the array stored
-			
+			Macros.storeITo(code, RunTime.FOR_LENGTH); // Length of the array stored
+
 			// Start loop: with stack []
 			code.add(Label, startLabel);
-			
-			Macros.loadIFrom(code, RunTime.FOR_LENGTH);                     // [len] 
-			Macros.loadIFrom(code, RunTime.FOR_INDEX);                      // [len index]
-			code.add(Subtract);                                             // [len-index]
-			code.add(JumpFalse, endLabel);                                  // []
-			
+
+			Macros.loadIFrom(code, RunTime.FOR_LENGTH); // [len]
+			Macros.loadIFrom(code, RunTime.FOR_INDEX); // [len index]
+			code.add(Subtract); // [len-index]
+			code.add(JumpFalse, endLabel); // []
+
 			// Continue the loop other wise
-			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);                  // [addOfIdentifier]
-			Macros.loadIFrom(code, RunTime.FOR_SEQUENCE);                   // [addOfIdentifier baseForFirstEl]
+			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER); // [addOfIdentifier]
+			Macros.loadIFrom(code, RunTime.FOR_SEQUENCE); // [addOfIdentifier baseForFirstEl]
 			Macros.loadIFrom(code, RunTime.FOR_INDEX);
 			code.add(PushI, subTypeSize);
 			code.add(Multiply);
 			code.add(Add);
 			code.append(opcodeForLoad(subType));
 			code.append(opcodeForStore(subType));
-			
+
 			// Unload variables on stack to avoid getting overwritten
 			Macros.loadIFrom(code, RunTime.FOR_LENGTH);
 			Macros.loadIFrom(code, RunTime.FOR_INDEX);
 			Macros.loadIFrom(code, RunTime.FOR_IDENTIFER);
 			Macros.loadIFrom(code, RunTime.FOR_SEQUENCE);
-			
+
 			// Ready to run the body
 			code.append(forBlock);
-			
+
 			code.add(Label, readyForNextIterationLabel);
-			
+
 			// Load back the original values after body is complete
 			Macros.storeITo(code, RunTime.FOR_SEQUENCE);
 			Macros.storeITo(code, RunTime.FOR_IDENTIFER);
 			Macros.storeITo(code, RunTime.FOR_INDEX);
 			Macros.storeITo(code, RunTime.FOR_LENGTH);
-			
+
 			// Comes here after running the block with empty stack.
 			Macros.incrementInteger(code, RunTime.FOR_INDEX);
 			code.add(Jump, startLabel);
-			
+
 			// End loop with stack []
 			code.add(Label, endLabel);
 		}
-		
+
 		public void visit(BreakNode node) {
 			newVoidCode(node);
-			
+
 			code.add(Jump, node.getEnclosingLoopEndLabel());
 		}
-		
+
 		public void visit(ContinueNode node) {
 			newVoidCode(node);
-			
+
 			code.add(Jump, node.getEnclosingLoopStartLabel());
 		}
-		
+
 		public void visitLeave(ReturnNode node) {
 			newVoidCode(node);
-			
-			if(node.nChildren() > 0) {
+
+			if (node.nChildren() > 0) {
 				code.append(removeValueCode(node.child(0)));
 			}
-			
+
 			code.add(Jump, node.whereToGoOnReturn());
 		}
-		
+
 		private void handleFunctionInvocationForCall(UnaryOperatorNode node) {
 			ASMCodeFragment inCaseNotNull = new ASMCodeFragment(GENERATES_VOID);
 			Type childType = node.child(0).getType();
@@ -729,7 +735,8 @@ public class ASMCodeGenerator {
 			}
 
 			newVoidCode(node);
-			code.append((childType instanceof NullType) ? removeVoidCode(node.child(0)) : removeValueCode(node.child(0)));
+			code.append(
+					(childType instanceof NullType) ? removeVoidCode(node.child(0)) : removeValueCode(node.child(0)));
 			code.append(inCaseNotNull);
 		}
 
@@ -764,9 +771,9 @@ public class ASMCodeGenerator {
 
 			}
 		}
-		
-		public void handleFunctionInvocation(KNaryOperatorNode node) {
-			if(node.getType() instanceof NullType) {
+
+		private void visitLeaveForFunctionInvocation(KNaryOperatorNode node) {
+			if (node.getType() instanceof NullType) {
 				newVoidCode(node);
 			} else {
 				newValueCode(node);
@@ -777,75 +784,72 @@ public class ASMCodeGenerator {
 			 * stack using stack pointer (if any)
 			 */
 
-			Macros.loadIFrom(code, RunTime.STACK_POINTER);                    // [... SP]
-			
+			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
+
 			for (int i = 1; i < node.nChildren(); i++) {
-				code.add(PushI, node.child(i).getType().getSize());           // [... SP sizeOfType]
-				code.add(Subtract);                                           // [... SP-sizeOfType] which is the location where will store our parameter
-				code.add(Duplicate);                                          // [... nSP nSP]
-				code.append(removeValueCode(node.child(i)));                  // [... nSP nSP pValue]
-				code.append(opcodeForStore(node.child(i).getType()));         // [... nSP]
+				code.add(PushI, node.child(i).getType().getSize()); // [... SP sizeOfType]
+				code.add(Subtract); // [... SP-sizeOfType] which is the location where will store our parameter
+				code.add(Duplicate); // [... nSP nSP]
+				code.append(removeValueCode(node.child(i))); // [... nSP nSP pValue]
+				code.append(opcodeForStore(node.child(i).getType())); // [... nSP]
 			}
-			
-			Macros.storeITo(code, RunTime.STACK_POINTER);                     // [...]
-			
+
+			Macros.storeITo(code, RunTime.STACK_POINTER); // [...]
+
 			// Call the function using address from first child!
-			code.append(removeValueCode(node.child(0)));                      // [... lambdaAddress]
-			code.add(CallV);                                                  // Jumps to lambdaAddress and stack becomes [... returnAddr]
-			
+			code.append(removeValueCode(node.child(0))); // [... lambdaAddress]
+			code.add(CallV); // Jumps to lambdaAddress and stack becomes [... returnAddr]
+
 			// After completing the function call, the code comes here with stack:
-			// [...] and with the value returned from function (if any) at stack pointer location
-			
+			// [...] and with the value returned from function (if any) at stack pointer
+			// location
+
 			Type returnType = node.getType();
 			int sizeOfReturnValue = returnType.getSize();
-			if(sizeOfReturnValue > 0) {
+			if (sizeOfReturnValue > 0) {
 				// We need the value
-				Macros.loadIFrom(code, RunTime.STACK_POINTER);                // [... SP] 
-				code.add(PushI, sizeOfReturnValue);                           // [... SP returnValueSize]
-				code.add(Subtract);                                           // [... SP-returnValueSize(newSP)]
-				code.append(opcodeForLoad(returnType));                       // [... valueReturnedFromFunctionCall]
+				Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
+				code.add(PushI, sizeOfReturnValue); // [... SP returnValueSize]
+				code.add(Subtract); // [... SP-returnValueSize(newSP)]
+				code.append(opcodeForLoad(returnType)); // [... valueReturnedFromFunctionCall]
 			}
 		}
 
-		public void visitLeave(KNaryOperatorNode node) {
-			if(node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
-				handleFunctionInvocation(node);
-				return;
-			} 
-			
+		private void visitLeaveForSubstringArrayIndexing(KNaryOperatorNode node) {
 			newValueCode(node);
-			
+
 			List<ASMCodeFragment> argList = new ArrayList<>();
-			for(ParseNode child: node.getChildren()) {
+			for (ParseNode child : node.getChildren()) {
 				argList.add(removeValueCode(child));
 			}
-			
+
 			assert !node.getSignature().isNull();
 			Object variant = node.getSignature().getVariant();
-			
-			if(variant instanceof ASMOpcode) {
-				for(ASMCodeFragment childFrag: argList) {
+
+			if (variant instanceof ASMOpcode) {
+				for (ASMCodeFragment childFrag : argList) {
 					code.append(childFrag);
 				}
-				
+
 				ASMOpcode opcode = (ASMOpcode) variant;
 				code.add(opcode);
-			} else if(variant instanceof SimpleCodeGenerator) {
-				for(ASMCodeFragment childFrag: argList) {
+			} else if (variant instanceof SimpleCodeGenerator) {
+				for (ASMCodeFragment childFrag : argList) {
 					code.append(childFrag);
 				}
-				
+
 				SimpleCodeGenerator generator = (SimpleCodeGenerator) variant;
 				ASMCodeFragment fragment = generator.generate(node);
 				code.append(fragment);
-				
+
 				if (fragment.isAddress()) {
 					// Which means that the fragment returns a pointer
 					code.markAsAddress(); // Now we know that this code is a pointer
 				}
 			} else if (variant instanceof FullCodeGenerator) {
 				FullCodeGenerator generator = (FullCodeGenerator) variant;
-				ASMCodeFragment fragment = generator.generate(node, argList.toArray(new ASMCodeFragment[argList.size()]));
+				ASMCodeFragment fragment = generator.generate(node,
+						argList.toArray(new ASMCodeFragment[argList.size()]));
 
 				code.append(fragment);
 
@@ -854,6 +858,33 @@ public class ASMCodeGenerator {
 				}
 			} else {
 				throw new UnsupportedOperationException("No ASMOpcode or fragment code matches the provided variant");
+			}
+		}
+		
+		private void visitLeaveForMapOperator(KNaryOperatorNode node) {
+			newValueCode(node);
+			
+			ASMCodeFragment array = removeValueCode(node.child(0));
+			ASMCodeFragment lambda = removeValueCode(node.child(1));
+			
+			code.append(array);
+			code.append(lambda);
+			code.append(new MapOperatorCodeGenerator().generate(node));
+		}
+		
+		private void visitLeaveForReduceOperator(KNaryOperatorNode node) {
+			
+		}
+
+		public void visitLeave(KNaryOperatorNode node) {
+			if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
+				visitLeaveForFunctionInvocation(node);
+			} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+				visitLeaveForSubstringArrayIndexing(node);
+			} else if (node.getToken().isLextant(Keyword.MAP)) {
+				visitLeaveForMapOperator(node);
+			} else if (node.getToken().isLextant(Keyword.REDUCE)) {
+				visitLeaveForReduceOperator(node);
 			}
 		}
 
@@ -1035,12 +1066,13 @@ public class ASMCodeGenerator {
 
 		public void visit(StringConstantNode node) {
 			newValueCode(node);
-			
+
 			// Dynamically add the string record
 			String value = node.getValue();
-			int recordSize = ASMCodeGenerationConstants.STRING_HEADER_SIZE + PrimitiveType.CHARACTER.getSize() * value.length() + 1;
+			int recordSize = ASMCodeGenerationConstants.STRING_HEADER_SIZE
+					+ PrimitiveType.CHARACTER.getSize() * value.length() + 1;
 			code.add(PushI, recordSize);
-			
+
 			// Stack: [... recordSize]
 			DynamicRecordCodeGenerator.createStringRecord(code, value);
 			Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);

@@ -687,11 +687,25 @@ public class Parser {
 			Token unaryOperationToken = nowReading;
 			readToken();
 			ParseNode child = parseUnaryOperatorExpression();
+			
+			// Special case if operator is zip
+			if(startsZipExpression(unaryOperationToken)) {
+				expect(Punctuator.SEPARATOR);
+				ParseNode child2 = parseUnaryOperatorExpression();
+				expect(Punctuator.SEPARATOR);
+				ParseNode child3 = parseUnaryOperatorExpression();
+				
+				return KNaryOperatorNode.withChildren(unaryOperationToken, child, child2, child3);
+			}
 
 			return UnaryOperatorNode.withChildren(unaryOperationToken, child);
 		} else {
 			return parseIndexingOrInvocationExpression();
 		}
+	}
+	
+	private boolean startsZipExpression(Token token) {
+		return token.isLextant(Keyword.ZIP);
 	}
 
 	private boolean startsUnaryOperatorExpression(Token token) {
@@ -699,7 +713,7 @@ public class Parser {
 	}
 
 	private boolean startsExplicitUnaryOperatorExpression(Token token) {
-		return token.isLextant(Keyword.LENGTH, Keyword.CLONE, Punctuator.NOT);
+		return token.isLextant(Keyword.LENGTH, Keyword.CLONE, Punctuator.NOT, Keyword.ZIP, Keyword.REVERSE);
 	}
 	
 	private ParseNode parseIndexingOrInvocationExpression() {

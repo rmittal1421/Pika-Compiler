@@ -34,7 +34,7 @@ public class RunTime {
 	public static final String STACK_POINTER = "$stack-pointer";
 	public static final String USABLE_MEMORY_START = "$usable-memory-start";
 	public static final String MAIN_PROGRAM_LABEL = "$$main";
-	
+
 	// Array static variables
 	public static final String ARRAY_INDEXING_ARRAY = "$a-indexing-array";
 	public static final String ARRAY_INDEXING_OTHER_ARRAY = "$a-indexing-other-array";
@@ -47,7 +47,7 @@ public class RunTime {
 	public static final String ARRAY_LENGTH = "$array-length";
 	public static final String CLEAR_N_BYTES = "$clear-n-bytes";
 	public static final String CLONE_ARRAY = "$clone-array";
-	
+
 	// Rational static variables
 	public static final String LOWEST_TERMS = "$lowest-terms";
 	public static final String RATIONAL_NUM = "$rational-num";
@@ -55,7 +55,7 @@ public class RunTime {
 	public static final String RATIONAL_GCD = "$rational-gcd";
 	public static final String EXPRESS_OVER_DEN = "$express-over-den";
 	public static final String RATIONAL_DEN_2_TEMP = "$rational-den-2-temp";
-	
+
 	// For loop static variables
 	public static final String FOR_IDENTIFER = "$for-identifier";
 	public static final String FOR_INDEX = "$for-index";
@@ -72,6 +72,7 @@ public class RunTime {
 	public static final String NEGATIVE_LENGTH_ARRAY_RUNTIME_ERROR = "$$array-length-negative";
 	public static final String NO_RETURN_IN_LAMBDA = "$$code-out-of-lambda-without-return";
 	public static final String LATER_INDEX_SMALLER_OR_EQUAL_RUNTIME_ERROR = "$$array-second-index-smaller-equal-error";
+	public static final String UNEQUAL_LENGTH_ARRAYS_ZIP_OPERATOR_ERROR = "$$unequal-length-array-zip-error";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
@@ -86,20 +87,20 @@ public class RunTime {
 		result.add(DLabel, USABLE_MEMORY_START);
 		return result;
 	}
-	
+
 	private ASMCodeFragment pointersForLambdas() {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		
+
 		// Declare and store for frame pointer
 		Macros.declareI(frag, FRAME_POINTER);
 		frag.add(Memtop);
 		Macros.storeITo(frag, FRAME_POINTER);
-		
+
 		// Declare and store for stack pointer
 		Macros.declareI(frag, STACK_POINTER);
 		frag.add(Memtop);
 		Macros.storeITo(frag, STACK_POINTER);
-		
+
 		return frag;
 	}
 
@@ -163,6 +164,7 @@ public class RunTime {
 		arraySecondIndexSmallerEqualError(frag);
 		arrayLengthNegativeError(frag);
 		lambdaWithoutReturnError(frag);
+		unequalLengthArraysZipOperatorError(frag);
 
 		return frag;
 	}
@@ -281,18 +283,23 @@ public class RunTime {
 		frag.add(JumpFalse, subroutineEnd); // [... baseAddr numBytes] && Jumps to end of the function
 		// Comes here if there are still more bytes to copy. First decrease numBytes
 		// since it is on top of stack
-		frag.add(PushI, 1);                 // [... baseAddr numBytes 1]
-		frag.add(Subtract);                 // [... baseAddr numBytes-1]
-		frag.add(Exchange);                 // [... numBytes-1 baseAddr]
-		frag.add(Duplicate);                // [... numBytes-1 baseAddr baseAddr]
+		frag.add(PushI, 1); // [... baseAddr numBytes 1]
+		frag.add(Subtract); // [... baseAddr numBytes-1]
+		frag.add(Exchange); // [... numBytes-1 baseAddr]
+		frag.add(Duplicate); // [... numBytes-1 baseAddr baseAddr]
 		Macros.loadIFrom(frag, ARRAY_INDEXING_ARRAY); // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy]
-		frag.add(Duplicate);                          // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy addressFromWhereToCopy]
-		frag.add(PushI, 1);                           // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy addressFromWhereToCopy 1]
-		frag.add(Add);                                // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy addressFromWhereToCopy+1]
-		Macros.storeITo(frag, ARRAY_INDEXING_ARRAY);  // Increment the cloned array pointer by 1 for next turn and store back -> [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy]
+		frag.add(Duplicate); // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy
+								// addressFromWhereToCopy]
+		frag.add(PushI, 1); // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy
+							// addressFromWhereToCopy 1]
+		frag.add(Add); // [... numBytes-1 baseAddr baseAddr addressFromWhereToCopy
+						// addressFromWhereToCopy+1]
+		Macros.storeITo(frag, ARRAY_INDEXING_ARRAY); // Increment the cloned array pointer by 1 for next turn and store
+														// back -> [... numBytes-1 baseAddr baseAddr
+														// addressFromWhereToCopy]
 		// Add a byte from the other array
-		frag.add(LoadC);                              // [... numBytes-1 baseAddr baseAddr *(addressFromWhereToCopy)]
-		frag.add(StoreC);                             // [... numBytes-1 baseAddr] & Value got store where I wanted
+		frag.add(LoadC); // [... numBytes-1 baseAddr baseAddr *(addressFromWhereToCopy)]
+		frag.add(StoreC); // [... numBytes-1 baseAddr] & Value got store where I wanted
 		// Now increase the base address by 1 byte
 		frag.add(PushI, 1); // [... (numBytes-1) baseAddr 1]
 		frag.add(Add); // [... (numBytes-1) (baseAddr+1)]
@@ -308,10 +315,10 @@ public class RunTime {
 		frag.add(PopPC);
 		return frag;
 	}
-	
+
 	private ASMCodeFragment lowestTerms() {
 		ASMCodeFragment frag = new ASMCodeFragment(GENERATES_VOID);
-		
+
 		Labeller labeller = new Labeller("lowest-terms");
 		String PC_TO_RETURN_TO = labeller.newLabel("pc-to-return-to");
 		String subroutineStart = labeller.newLabel("subroutine-start");
@@ -319,93 +326,90 @@ public class RunTime {
 		String subroutineEnd = labeller.newLabel("subroutine-end");
 		String numWasFoundZero = labeller.newLabel("num-was-0");
 		String coreEnd = labeller.newLabel("core-end-lowest-term");
-		
+
 		// Stack received: [... num den returnPointer]
 		frag.add(Label, LOWEST_TERMS);
-				
-		Macros.declareI(frag, PC_TO_RETURN_TO);         
-		Macros.storeITo(frag, PC_TO_RETURN_TO);               // [... num den] & returnPointer saved
-		
+
+		Macros.declareI(frag, PC_TO_RETURN_TO);
+		Macros.storeITo(frag, PC_TO_RETURN_TO); // [... num den] & returnPointer saved
+
 		Macros.declareI(frag, RATIONAL_GCD);
 
-		Macros.storeITo(frag, RATIONAL_DEN);                  // [... num]
-		Macros.storeITo(frag, RATIONAL_NUM);                  // [...]
-		
+		Macros.storeITo(frag, RATIONAL_DEN); // [... num]
+		Macros.storeITo(frag, RATIONAL_NUM); // [...]
+
 		// Sanitize denominator
-		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... den]
-		frag.add(JumpFalse, RATIONAL_NUMBER_GIVEN_ZERO_DENOMINATOR);  // Goes to runtime error if den evaluates to be zero
-		
+		Macros.loadIFrom(frag, RATIONAL_DEN); // [... den]
+		frag.add(JumpFalse, RATIONAL_NUMBER_GIVEN_ZERO_DENOMINATOR); // Goes to runtime error if den evaluates to be
+																		// zero
+
 		// Sanitize numerator
-		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... num]
-		frag.add(JumpFalse, numWasFoundZero);                 // [...] & jumps if num was 0 to the handling of this case
-		
+		Macros.loadIFrom(frag, RATIONAL_NUM); // [... num]
+		frag.add(JumpFalse, numWasFoundZero); // [...] & jumps if num was 0 to the handling of this case
+
 		/*
 		 * pseudoCode:
 		 * 
-		 * while(num != den) {
-		 * 	if(num>den) num -= den
-		 *  else den -= num
-		 * }
-		 * return num
+		 * while(num != den) { if(num>den) num -= den else den -= num } return num
 		 */
-		
+
 		Macros.loadIFrom(frag, RATIONAL_NUM);
 		Macros.loadIFrom(frag, RATIONAL_DEN);
-		frag.add(Multiply);                                   // [... num*den] but treat as if [...] ----> actual product stored
-		
-		Macros.loadMakePositiveStore(frag, RATIONAL_DEN);     // [... num] & den made positive
-		Macros.loadMakePositiveStore(frag, RATIONAL_NUM);     // [...] & num made positive
-		
-		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... num]
-		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den]
-		frag.add(Multiply);                                   // [... num*den]    -----> product of num and den both being positive
-		
+		frag.add(Multiply); // [... num*den] but treat as if [...] ----> actual product stored
+
+		Macros.loadMakePositiveStore(frag, RATIONAL_DEN); // [... num] & den made positive
+		Macros.loadMakePositiveStore(frag, RATIONAL_NUM); // [...] & num made positive
+
+		Macros.loadIFrom(frag, RATIONAL_NUM); // [... num]
+		Macros.loadIFrom(frag, RATIONAL_DEN); // [... num den]
+		frag.add(Multiply); // [... num*den] -----> product of num and den both being positive
+
 		// Remember we stored their actual product as well
-		frag.add(Divide);                                     // [... -1 or 1] depending on we want -ve or not. (Leave it there)
-		
-		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... (-1 or 1) num]
-		frag.add(Multiply);                                   // [... num] (Maybe +ve or -ve which is final now)
-		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den]       and behave as if it it [...]
-		
+		frag.add(Divide); // [... -1 or 1] depending on we want -ve or not. (Leave it there)
+
+		Macros.loadIFrom(frag, RATIONAL_NUM); // [... (-1 or 1) num]
+		frag.add(Multiply); // [... num] (Maybe +ve or -ve which is final now)
+		Macros.loadIFrom(frag, RATIONAL_DEN); // [... num den] and behave as if it it [...]
+
 		frag.add(Label, subroutineStart);
-		
+
 		Macros.loadIFrom(frag, RATIONAL_NUM);
-		Macros.loadIFrom(frag, RATIONAL_DEN);                 // [... num den]
-		
-		frag.add(Subtract);                                   // [... num-den]
-		frag.add(Duplicate);                                  // [... num-den num-den]
-		frag.add(JumpFalse, subroutineEnd);                   // [... num-den] & Jumps to end with stack [... 0]
-		
+		Macros.loadIFrom(frag, RATIONAL_DEN); // [... num den]
+
+		frag.add(Subtract); // [... num-den]
+		frag.add(Duplicate); // [... num-den num-den]
+		frag.add(JumpFalse, subroutineEnd); // [... num-den] & Jumps to end with stack [... 0]
+
 		// Comes here which means that num and den are not equal yet
-		frag.add(Duplicate);                                  // [... num-den num-den]
-		frag.add(JumpPos, numGreaterLabel);                   // [... num-den]
+		frag.add(Duplicate); // [... num-den num-den]
+		frag.add(JumpPos, numGreaterLabel); // [... num-den]
 		// Else den is greater or equal
-		frag.add(Negate);                                     // [... den-num]
-		Macros.storeITo(frag, RATIONAL_DEN);                  // [...]
-		frag.add(Jump, subroutineStart);                      // [...]
-		
-		frag.add(Label, numGreaterLabel);                     // [... num-den]
-		Macros.storeITo(frag, RATIONAL_NUM);                  // [...]
-		frag.add(Jump, subroutineStart);                      // [...]
-		
-		frag.add(Label, subroutineEnd);                       // [... 0]
-		frag.add(Pop);                                        // [...]
-		Macros.loadIFrom(frag, RATIONAL_NUM);                 // [... gcd] Num & Den both are basically gcd now so load one
-		frag.add(Duplicate);                                  // [... gcd gcd]
-		Macros.storeITo(frag, RATIONAL_GCD);                  // [...gcd] but remember we said [... gcd] === [... num den gcd]
-		frag.add(Divide);                                     // [... num den/gcd]
-		frag.add(Exchange);                                   // [... den/gcd num]
+		frag.add(Negate); // [... den-num]
+		Macros.storeITo(frag, RATIONAL_DEN); // [...]
+		frag.add(Jump, subroutineStart); // [...]
+
+		frag.add(Label, numGreaterLabel); // [... num-den]
+		Macros.storeITo(frag, RATIONAL_NUM); // [...]
+		frag.add(Jump, subroutineStart); // [...]
+
+		frag.add(Label, subroutineEnd); // [... 0]
+		frag.add(Pop); // [...]
+		Macros.loadIFrom(frag, RATIONAL_NUM); // [... gcd] Num & Den both are basically gcd now so load one
+		frag.add(Duplicate); // [... gcd gcd]
+		Macros.storeITo(frag, RATIONAL_GCD); // [...gcd] but remember we said [... gcd] === [... num den gcd]
+		frag.add(Divide); // [... num den/gcd]
+		frag.add(Exchange); // [... den/gcd num]
 		Macros.loadIFrom(frag, RATIONAL_GCD);
-		frag.add(Divide);                                     // [... den/gcd num/gcd]
-		frag.add(Exchange);                                   // [... refactoredNum refactoredDen]
+		frag.add(Divide); // [... den/gcd num/gcd]
+		frag.add(Exchange); // [... refactoredNum refactoredDen]
 		frag.add(Jump, coreEnd);
-		
-		frag.add(Label, numWasFoundZero);                     // [...] & num was 0 den was not
-		frag.add(PushI, 0);                                   // [... 0]
-		frag.add(PushI, 1);                                   // [... 0 1]
-		
+
+		frag.add(Label, numWasFoundZero); // [...] & num was 0 den was not
+		frag.add(PushI, 0); // [... 0]
+		frag.add(PushI, 1); // [... 0 1]
+
 		frag.add(Label, coreEnd);
-		Macros.loadIFrom(frag, PC_TO_RETURN_TO);              // [... num den returnPointer]
+		Macros.loadIFrom(frag, PC_TO_RETURN_TO); // [... num den returnPointer]
 		frag.add(PopPC);
 		return frag;
 	}
@@ -431,13 +435,13 @@ public class RunTime {
 		frag.add(PushD, floatingDivideByZeroMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
-	
+
 	private void rationalGotZeroDenominatorError(ASMCodeFragment frag) {
 		String ratioanalGotZeroMessage = "$errors-rational-denomitor-zero";
-		
+
 		frag.add(DLabel, ratioanalGotZeroMessage);
 		frag.add(DataS, "rational number given 0 as denominator");
-		
+
 		frag.add(Label, RATIONAL_NUMBER_GIVEN_ZERO_DENOMINATOR);
 		frag.add(PushD, ratioanalGotZeroMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
@@ -464,13 +468,13 @@ public class RunTime {
 		frag.add(PushD, arrayIndexOutOfBoundsMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
-	
+
 	private void arraySecondIndexSmallerEqualError(ASMCodeFragment frag) {
 		String arraySecondIndexSmallerEqualMessage = "$errors-array-second-index-smaller-equal";
-		
+
 		frag.add(DLabel, arraySecondIndexSmallerEqualMessage);
 		frag.add(DataS, "Second index smaller or equal to first one in substring");
-		
+
 		frag.add(Label, LATER_INDEX_SMALLER_OR_EQUAL_RUNTIME_ERROR);
 		frag.add(PushD, arraySecondIndexSmallerEqualMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
@@ -486,15 +490,26 @@ public class RunTime {
 		frag.add(PushD, arrayLengthNegativeMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
-	
+
 	private void lambdaWithoutReturnError(ASMCodeFragment frag) {
 		String codeOutOfLambdaWithoutReturnMessage = "$code-out-of-lambda-without-return";
-		
+
 		frag.add(DLabel, codeOutOfLambdaWithoutReturnMessage);
 		frag.add(DataS, "Reached end of function without return statement");
-		
+
 		frag.add(Label, NO_RETURN_IN_LAMBDA);
 		frag.add(PushD, codeOutOfLambdaWithoutReturnMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+
+	public void unequalLengthArraysZipOperatorError(ASMCodeFragment frag) {
+		String unequalLengthArraysZipOperatorErrorMessage = "$unequal-length-arrays-zip-operator";
+
+		frag.add(DLabel, unequalLengthArraysZipOperatorErrorMessage);
+		frag.add(DataS, "Both arrays given different lengths in zip operator");
+
+		frag.add(Label, UNEQUAL_LENGTH_ARRAYS_ZIP_OPERATOR_ERROR);
+		frag.add(PushD, unequalLengthArraysZipOperatorErrorMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 

@@ -337,6 +337,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			typeCheckError(node, childTypes);
 			node.setType(PrimitiveType.ERROR);
 			return;
+		} else if (node.getToken().isLextant(Keyword.REVERSE) && !(node.child(0).getType() instanceof Array 
+				|| node.child(0).getType().equivalent(PrimitiveType.STRING))) {
+			typeCheckError(node, childTypes);
+			node.setType(PrimitiveType.ERROR);
+			return;
 		}
 
 		if (node.getToken().isLextant(Keyword.CLONE)) {
@@ -397,20 +402,20 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		}
 	}
 
-	private void visitLeaveForSubstringArrayIndexing(KNaryOperatorNode node) {
+	private void visitLeaveForFSOperator(KNaryOperatorNode node) {
 		// Array indexing not considered as binary if it is substring operation.
-		if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
-			substringOnNotStringType(node);
-			node.setType(PrimitiveType.ERROR);
-			return;
+		if(node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+			if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
+				substringOnNotStringType(node);
+				node.setType(PrimitiveType.ERROR);
+				return;
+			}
 		}
-
-		assert node.nChildren() == 3;
-		ParseNode base = node.child(0);
-		ParseNode firstIndex = node.child(1);
-		ParseNode secondIndex = node.child(2);
-
-		List<Type> childTypes = Arrays.asList(base.getType(), firstIndex.getType(), secondIndex.getType());
+		
+		List<Type> childTypes = new ArrayList<>();
+		for(ParseNode child: node.getChildren()) {
+			childTypes.add(child.getType());
+		}
 
 		Lextant operator = ((LextantToken) (node.getToken())).getLextant();
 		FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
@@ -522,18 +527,67 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		return;
 	}
 
+	private void visitLeaveForZipOperator(KNaryOperatorNode node) {
+		assert node.nChildren() == 3;
+		assert node.getToken().isLextant(Keyword.ZIP);
+
+		List<Type> childTypes = new ArrayList<>();
+		childTypes.add(node.child(0).getType());
+		childTypes.add(node.child(1).getType());
+		childTypes.add(node.child(2).getType());
+
+		if (childTypes.get(0) instanceof Array && childTypes.get(1) instanceof Array
+				&& childTypes.get(2) instanceof Lambda) {
+
+			Lambda lambdaType = (Lambda) childTypes.get(2);
+
+			if (lambdaType.getNumberOfParameters() == 2) {
+
+				List<Type> arraySubTypes = new ArrayList<>();
+				arraySubTypes.add(((Array)childTypes.get(0)).getSubtype());
+				arraySubTypes.add(((Array)childTypes.get(1)).getSubtype());
+				if (lambdaType.equivalentParams(arraySubTypes)) {
+
+					if (!(lambdaType.getReturnType() instanceof NullType)) {
+
+						// Semantically, this is a correct map operation
+						node.setType(new Array(lambdaType.getReturnType()));
+						return;
+
+					} else {
+						ZipLambdaReturnTypeNullError(node);
+					}
+
+				} else {
+					ZipLambdaParamTypeMismatchArraySubTypeError(node);
+				}
+
+			} else {
+				ZipLambdaNumberOfParametersError(node);
+			}
+
+		} else {
+			typeCheckError(node, childTypes);
+		}
+
+		node.setType(PrimitiveType.ERROR);
+		return;
+	}
+
 	@Override
 	public void visitLeave(KNaryOperatorNode node) {
 		assert node.nChildren() > 0;
 
 		if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
 			visitLeaveForFunctionInvocation(node);
-		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
-			visitLeaveForSubstringArrayIndexing(node);
 		} else if (node.getToken().isLextant(Keyword.MAP)) {
 			visitLeaveForMapOperator(node);
 		} else if (node.getToken().isLextant(Keyword.REDUCE)) {
 			visitLeaveForReduceOperator(node);
+		} else if (node.getToken().isLextant(Keyword.ZIP)) {
+			visitLeaveForZipOperator(node);
+		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+			visitLeaveForFSOperator(node);
 		} else {
 			List<Type> childTypes = new ArrayList<>();
 			for (ParseNode child : node.getChildren()) {
@@ -992,7 +1046,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		logError("Map operator expression expects lambda's param type to be equal to array subtype at "
 				+ token.getLocation());
 	}
-	
+
 	private void MapLambdaReturnTypeNullError(ParseNode node) {
 		Token token = node.getToken();
 
@@ -1016,6 +1070,25 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("Reduce operator expression expects lambda's return type to be boolean at " + token.getLocation());
+	}
+	
+	private void ZipLambdaNumberOfParametersError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Zip operator expression expects a lambda with exactly two parameter at " + token.getLocation());
+	}
+
+	private void ZipLambdaParamTypeMismatchArraySubTypeError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Zip operator expression expects lambda's param types to be equal to array's subtype respectively at "
+				+ token.getLocation());
+	}
+
+	private void ZipLambdaReturnTypeNullError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Zip operator expression expects lambda's return type to be not null at " + token.getLocation());
 	}
 
 	private void logError(String message) {

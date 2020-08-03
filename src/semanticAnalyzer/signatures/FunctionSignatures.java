@@ -32,6 +32,7 @@ import asmCodeGenerator.specialCodeGenerator.IntegerDivideCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalAdditionCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalDivideCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.RationalSubtractionCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.ReverseOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CastFromRationalCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CastToRationalCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.CharStringConcatenationCodeGenerator;
@@ -218,7 +219,7 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 				new FunctionSignature(new StringSubstringCodeGenerator(), PrimitiveType.STRING, PrimitiveType.INTEGER, PrimitiveType.INTEGER, 
 						PrimitiveType.STRING)
 				);
-
+		
 		for (Punctuator comparison : Punctuator.ComparisonOperators) {
 			FunctionSignature iSignature = new FunctionSignature(1, PrimitiveType.INTEGER, PrimitiveType.INTEGER,
 					PrimitiveType.BOOLEAN);
@@ -255,6 +256,10 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 				);
 		new FunctionSignatures(Keyword.DEALLOC,
 				new FunctionSignature(new ArrayDeallocCodeGenerator(), setS, new Array(S), PrimitiveType.NO_TYPE)
+				);
+		new FunctionSignatures(Keyword.REVERSE,
+				new FunctionSignature(new ReverseOperatorCodeGenerator(), setS, new Array(S), new Array(S)),
+				new FunctionSignature(new ReverseOperatorCodeGenerator(), PrimitiveType.STRING, PrimitiveType.STRING)
 				);
 		
 		// Array Signatures

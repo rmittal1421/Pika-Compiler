@@ -13,6 +13,7 @@ import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.MapOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.ReduceOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.ZipOperatorCodeGenerator;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
 import lexicalAnalyzer.Punctuator;
@@ -816,7 +817,7 @@ public class ASMCodeGenerator {
 			}
 		}
 
-		private void visitLeaveForSubstringArrayIndexing(KNaryOperatorNode node) {
+		private void visitLeaveForFSOperators(KNaryOperatorNode node) {
 			newValueCode(node);
 
 			List<ASMCodeFragment> argList = new ArrayList<>();
@@ -883,16 +884,31 @@ public class ASMCodeGenerator {
 			code.append(lambda);
 			code.append(new ReduceOperatorCodeGenerator().generate(node));
 		}
+		
+		private void visitLeaveForZipOperator(KNaryOperatorNode node) {
+			newValueCode(node);
+			
+			ASMCodeFragment array1 = removeValueCode(node.child(0));
+			ASMCodeFragment array2 = removeValueCode(node.child(1));
+			ASMCodeFragment lambda = removeValueCode(node.child(2));
+			
+			code.append(array1);
+			code.append(array2);
+			code.append(lambda);
+			code.append(new ZipOperatorCodeGenerator().generate(node));
+		}
 
 		public void visitLeave(KNaryOperatorNode node) {
 			if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
 				visitLeaveForFunctionInvocation(node);
-			} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
-				visitLeaveForSubstringArrayIndexing(node);
 			} else if (node.getToken().isLextant(Keyword.MAP)) {
 				visitLeaveForMapOperator(node);
 			} else if (node.getToken().isLextant(Keyword.REDUCE)) {
 				visitLeaveForReduceOperator(node);
+			} else if (node.getToken().isLextant(Keyword.ZIP)) {
+				visitLeaveForZipOperator(node);
+			} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+				visitLeaveForFSOperators(node);
 			}
 		}
 

@@ -114,9 +114,6 @@ public class DynamicRecordCodeGenerator {
 					value.length());
 		
 		// Fill in characters
-//		Macros.readIPtrOffset(code, 
-//							RunTime.RECORD_CREATION_TEMPORARY, 
-//							ASMCodeGenerationConstants.STRING_HEADER_SIZE);
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 		code.add(PushI, ASMCodeGenerationConstants.STRING_HEADER_SIZE);
 		code.add(Add);

@@ -34,6 +34,8 @@ public enum Keyword implements Lextant {
 	// New operators
 	MAP("map"),
 	REDUCE("reduce"),
+	ZIP("zip"),
+	REVERSE("reverse"),
 	
 	// Types
 	BOOL("bool"),

@@ -2,6 +2,7 @@ package asmCodeGenerator.specialCodeGenerator;
 
 import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMCodeFragment.CodeType;
+import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
 import lexicalAnalyzer.Keyword;
 import parseTree.ParseNode;
@@ -214,6 +215,11 @@ public class ReduceOperatorCodeGenerator implements SimpleCodeGenerator {
 		code.add(Jump, startMainLoop);
 		
 		code.add(Label, endMainLoop);
+		
+		Macros.loadIFrom(code, RunTime.ARRAY_INDEXING_OTHER_ARRAY);
+		code.add(PushI, ASMCodeGenerationConstants.ARRAY_HEADER_SIZE);
+		code.add(Subtract);
+		code.add(Call, MemoryManager.MEM_MANAGER_DEALLOCATE);
 		
 		Macros.loadIFrom(code, RunTime.RECORD_CREATION_TEMPORARY);
 		

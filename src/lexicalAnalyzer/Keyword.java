@@ -31,6 +31,10 @@ public enum Keyword implements Lextant {
 	ELEM("elem"),
 	OF("of"),
 	
+	// New operators
+	MAP("map"),
+	REDUCE("reduce"),
+	
 	// Types
 	BOOL("bool"),
 	CHAR("char"),

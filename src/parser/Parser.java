@@ -633,12 +633,12 @@ public class Parser {
 			return syntaxErrorNode("multiplicativeExpression");
 		}
 
-		ParseNode left = parseUnaryOperatorExpression();
+		ParseNode left = parseMapOrReduceExpression();
 		while (nowReading.isLextant(Punctuator.MULTIPLY, Punctuator.DIVIDE, Punctuator.OVER, Punctuator.EXPRESS_OVER,
 				Punctuator.RATIONALIZE)) {
 			Token multiplicativeToken = nowReading;
 			readToken();
-			ParseNode right = parseUnaryOperatorExpression();
+			ParseNode right = parseMapOrReduceExpression();
 
 			left = BinaryOperatorNode.withChildren(multiplicativeToken, left, right);
 		}
@@ -646,7 +646,36 @@ public class Parser {
 	}
 
 	private boolean startsMultiplicativeExpression(Token token) {
+		return startsMapOrReduceExpression(token);
+	}
+	
+	private ParseNode parseMapOrReduceExpression() {
+		if(!startsMapOrReduceExpression(nowReading)) {
+			return syntaxErrorNode("Map or Reduce expression");
+		}
+		
+		ParseNode left = parseUnaryOperatorExpression();
+		while(startsMapExpression(nowReading) || startsReduceExpression(nowReading)) {
+			Token operatorToken = nowReading;
+			readToken();
+			ParseNode right = parseUnaryOperatorExpression();
+			
+			left = KNaryOperatorNode.withChildren(operatorToken, left, right);
+ 		}
+		
+		return left;
+	}
+	
+	private boolean startsMapOrReduceExpression(Token token) {
 		return startsUnaryOperatorExpression(token);
+	}
+	
+	private boolean startsMapExpression(Token token) {
+		return token.isLextant(Keyword.MAP);
+	}
+	
+	private boolean startsReduceExpression(Token token) {
+		return token.isLextant(Keyword.REDUCE);
 	}
 
 	private ParseNode parseUnaryOperatorExpression() {

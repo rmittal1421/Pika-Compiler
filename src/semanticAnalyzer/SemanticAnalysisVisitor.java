@@ -362,78 +362,131 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		LextantToken token = (LextantToken) node.getToken();
 		return token.getLextant();
 	}
+	
+	private void visitLeaveForFunctionInvocation(KNaryOperatorNode node) {
+		if (!(node.child(0).getType() instanceof Lambda)) {
+			notLambdaInvoked(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
+		}
 
-	@Override
-	public void visitLeave(KNaryOperatorNode node) {
-		// As of now, KNaryOperatorNodes are used just for function invocations
-		assert node.nChildren() > 0;
+		Lambda lambdaType = (Lambda) node.child(0).getType();
 
-		if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
-			if (!(node.child(0).getType() instanceof Lambda)) {
-				notLambdaInvoked(node);
-				node.setType(PrimitiveType.ERROR);
-				return;
-			}
+		// Check types of params against the children types
+		List<Type> paramTypes = new ArrayList<>();
+		for (int i = 1; i < node.nChildren(); i++) {
+			paramTypes.add(node.child(i).getType());
+		}
 
-			Lambda lambdaType = (Lambda) node.child(0).getType();
+		if (lambdaType.equivalentParams(paramTypes)) {
+			/*
+			 * Two cases: 1. If return type is null and not called by 'call' -> error node
+			 * 2. All other cases
+			 */
 
-			// Check types of params against the children types
-			List<Type> paramTypes = new ArrayList<>();
-			for (int i = 1; i < node.nChildren(); i++) {
-				paramTypes.add(node.child(i).getType());
-			}
-
-			if (lambdaType.equivalentParams(paramTypes)) {
-				/*
-				 * Two cases: 1. If return type is null and not called by 'call' -> error node
-				 * 2. All other cases
-				 */
-
-				Type returnType = lambdaType.getReturnType();
-				if (!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
-					funcReturnNullUsedAsAssignment(node);
-					node.setType(PrimitiveType.ERROR);
-				}
-				node.setType(lambdaType.getReturnType());
-			} else {
-				// error
-				typeCheckError(node, paramTypes);
+			Type returnType = lambdaType.getReturnType();
+			if (!node.getParent().getToken().isLextant(Keyword.CALL) && returnType.equivalent(new NullType())) {
+				funcReturnNullUsedAsAssignment(node);
 				node.setType(PrimitiveType.ERROR);
 			}
+			node.setType(lambdaType.getReturnType());
+		} else {
+			// error
+			typeCheckError(node, paramTypes);
+			node.setType(PrimitiveType.ERROR);
+		}
+	}
+	
+	private void visitLeaveForSubstringArrayIndexing(KNaryOperatorNode node) {
+		// Array indexing not considered as binary if it is substring operation.
+		if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
+			substringOnNotStringType(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
+		}
 
-		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
-			// Array indexing not considered as binary if it is substring operation.
-			if (!(node.child(0).getType().equivalent(PrimitiveType.STRING))) {
-				substringOnNotStringType(node);
-				node.setType(PrimitiveType.ERROR);
-				return;
-			}
+		assert node.nChildren() == 3;
+		ParseNode base = node.child(0);
+		ParseNode firstIndex = node.child(1);
+		ParseNode secondIndex = node.child(2);
 
-			assert node.nChildren() == 3;
-			ParseNode base = node.child(0);
-			ParseNode firstIndex = node.child(1);
-			ParseNode secondIndex = node.child(2);
+		List<Type> childTypes = Arrays.asList(base.getType(), firstIndex.getType(), secondIndex.getType());
 
-			List<Type> childTypes = Arrays.asList(base.getType(), firstIndex.getType(), secondIndex.getType());
+		Lextant operator = ((LextantToken) (node.getToken())).getLextant();
+		FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
+		FunctionSignature signature = signatures.acceptingSignature(childTypes);
 
-			Lextant operator = ((LextantToken) (node.getToken())).getLextant();
-			FunctionSignatures signatures = FunctionSignatures.signaturesOf(operator);
-			FunctionSignature signature = signatures.acceptingSignature(childTypes);
-
+		if (signature.accepts(childTypes)) {
+			node.setType(signature.resultType());
+			node.setSignature(signature);
+		} else {
+			// Try promoting and check again
+			signature = findSuitableSignature(node, signatures, childTypes);
 			if (signature.accepts(childTypes)) {
 				node.setType(signature.resultType());
 				node.setSignature(signature);
 			} else {
-				// Try promoting and check again
-				signature = findSuitableSignature(node, signatures, childTypes);
-				if (signature.accepts(childTypes)) {
-					node.setType(signature.resultType());
-					node.setSignature(signature);
-				} else {
-					typeCheckError(node, childTypes);
-					node.setType(PrimitiveType.ERROR);
-				}
+				typeCheckError(node, childTypes);
+				node.setType(PrimitiveType.ERROR);
 			}
+		}
+	}
+	
+	private void visitLeaveForMapOperator(KNaryOperatorNode node) {
+		assert node.nChildren() == 2;
+		assert node.getToken().isLextant(Keyword.MAP);
+		
+		List<Type> childTypes = new ArrayList<>();
+		childTypes.add(node.child(0).getType());
+		childTypes.add(node.child(1).getType());
+		
+		if(childTypes.get(0) instanceof Array && childTypes.get(1) instanceof Lambda) {
+
+			Lambda lambdaType = (Lambda) childTypes.get(1);
+			
+			if(lambdaType.getNumberOfParameters() == 1) {
+				
+				Type lambdaParamType = lambdaType.getParamTypes().get(0);
+				Type subTypeOfArray = ((Array) childTypes.get(0)).getSubtype();
+				
+				if(lambdaParamType.equivalent(subTypeOfArray)) {
+					
+					// Semantically, this is a correct map operation
+					node.setType(new Array(lambdaType.getReturnType()));
+					return;
+					
+				} else {
+					MapLambdaParamTypeMismatchArraySubTypeError(node);
+				}
+				
+			} else {
+				MapLambdaNumberOfParametersError(node);
+			}
+			
+		} else {
+			typeCheckError(node, childTypes);
+		}
+		
+		node.setType(PrimitiveType.ERROR);
+		return;
+	}
+	
+	private void visitLeaveForReduceOperator(KNaryOperatorNode node) {
+		
+	}
+
+	@Override
+	public void visitLeave(KNaryOperatorNode node) {
+		assert node.nChildren() > 0;
+
+		if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
+			visitLeaveForFunctionInvocation(node);
+		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
+			visitLeaveForSubstringArrayIndexing(node);
+		} else if (node.getToken().isLextant(Keyword.MAP)) {
+			visitLeaveForMapOperator(node);
+		} else if (node.getToken().isLextant(Keyword.REDUCE)) {
+			visitLeaveForReduceOperator(node);
 		} else {
 			List<Type> childTypes = new ArrayList<>();
 			for (ParseNode child : node.getChildren()) {
@@ -878,6 +931,18 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("For loop expected expression of record type to loop on at " + token.getLocation());
+	}
+	
+	private void MapLambdaNumberOfParametersError(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("Map operator expression expects a lambda with exactly one parameter at " + token.getLocation());
+	}
+	
+	private void MapLambdaParamTypeMismatchArraySubTypeError(ParseNode node) {
+		Token token = node.getToken();
+		
+		logError("Map operator expression expects lambda's param type to be equal to array subtype at " + token.getLocation());
 	}
 
 	private void logError(String message) {

@@ -1,0 +1,8 @@
+exec {
+	var numbers := [1,2,3].
+	var parityString := <int a> -> string {
+		return "Odd".
+	}.
+	
+	var parities := numbers map <int a> -> string { return "Odd". }.
+}

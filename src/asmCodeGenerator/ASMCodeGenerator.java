@@ -11,6 +11,7 @@ import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
 import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.MapOperatorCodeGenerator;
+import asmCodeGenerator.specialCodeGenerator.ReduceOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.SimpleCodeGenerator;
 import lexicalAnalyzer.Keyword;
 import lexicalAnalyzer.Lextant;
@@ -873,7 +874,14 @@ public class ASMCodeGenerator {
 		}
 		
 		private void visitLeaveForReduceOperator(KNaryOperatorNode node) {
+			newValueCode(node);
 			
+			ASMCodeFragment array = removeValueCode(node.child(0));
+			ASMCodeFragment lambda = removeValueCode(node.child(1));
+			
+			code.append(array);
+			code.append(lambda);
+			code.append(new ReduceOperatorCodeGenerator().generate(node));
 		}
 
 		public void visitLeave(KNaryOperatorNode node) {

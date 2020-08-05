@@ -633,12 +633,12 @@ public class Parser {
 			return syntaxErrorNode("multiplicativeExpression");
 		}
 
-		ParseNode left = parseMapOrReduceExpression();
+		ParseNode left = parseFoldExperssion();
 		while (nowReading.isLextant(Punctuator.MULTIPLY, Punctuator.DIVIDE, Punctuator.OVER, Punctuator.EXPRESS_OVER,
 				Punctuator.RATIONALIZE)) {
 			Token multiplicativeToken = nowReading;
 			readToken();
-			ParseNode right = parseMapOrReduceExpression();
+			ParseNode right = parseFoldExperssion();
 
 			left = BinaryOperatorNode.withChildren(multiplicativeToken, left, right);
 		}
@@ -646,7 +646,39 @@ public class Parser {
 	}
 
 	private boolean startsMultiplicativeExpression(Token token) {
-		return startsMapOrReduceExpression(token);
+		return startsFoldExpression(token);
+	}
+	
+	private ParseNode parseFoldExperssion() {
+		if(!startsFoldExpression(nowReading)) {
+			return syntaxErrorNode("Fold expression");
+		}
+		
+		ParseNode left = parseMapOrReduceExpression();
+		while(isFoldExpression(nowReading)) {
+			Token foldToken = nowReading;
+			readToken();
+			
+			left = KNaryOperatorNode.withChildren(foldToken, left);
+			
+			if(nowReading.isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
+				readToken();
+				left.appendChild(parseExpression());
+				expect(Punctuator.CLOSE_SQUARE_BRACKET);
+			}
+			
+			left.appendChild(parseMapOrReduceExpression());
+		}
+		
+		return left;
+	}
+	
+	private boolean startsFoldExpression(Token token) {
+		return startsMapOrReduceExpression(token); 
+	}
+	
+	private boolean isFoldExpression(Token token) {
+		return token.isLextant(Keyword.FOLD);
 	}
 	
 	private ParseNode parseMapOrReduceExpression() {

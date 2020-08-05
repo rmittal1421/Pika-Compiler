@@ -9,6 +9,7 @@ import asmCodeGenerator.codeStorage.ASMCodeFragment;
 import asmCodeGenerator.codeStorage.ASMOpcode;
 import asmCodeGenerator.runtime.MemoryManager;
 import asmCodeGenerator.runtime.RunTime;
+import asmCodeGenerator.specialCodeGenerator.FoldOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.FullCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.MapOperatorCodeGenerator;
 import asmCodeGenerator.specialCodeGenerator.ReduceOperatorCodeGenerator;
@@ -785,6 +786,11 @@ public class ASMCodeGenerator {
 			 * To handle function calls, First, store all the parameter values on the memory
 			 * stack using stack pointer (if any)
 			 */
+			
+			List<ASMCodeFragment> childrenCode = new ArrayList<>();
+			for(ParseNode child: node.getChildren()) {
+				childrenCode.add(removeValueCode(child));
+			}
 
 			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
 
@@ -792,14 +798,14 @@ public class ASMCodeGenerator {
 				code.add(PushI, node.child(i).getType().getSize()); // [... SP sizeOfType]
 				code.add(Subtract); // [... SP-sizeOfType] which is the location where will store our parameter
 				code.add(Duplicate); // [... nSP nSP]
-				code.append(removeValueCode(node.child(i))); // [... nSP nSP pValue]
+				code.append(childrenCode.get(i)); // [... nSP nSP pValue]
 				code.append(opcodeForStore(node.child(i).getType())); // [... nSP]
 			}
 
 			Macros.storeITo(code, RunTime.STACK_POINTER); // [...]
 
 			// Call the function using address from first child!
-			code.append(removeValueCode(node.child(0))); // [... lambdaAddress]
+			code.append(childrenCode.get(0)); // [... lambdaAddress]
 			code.add(CallV); // Jumps to lambdaAddress and stack becomes [... returnAddr]
 
 			// After completing the function call, the code comes here with stack:
@@ -897,6 +903,22 @@ public class ASMCodeGenerator {
 			code.append(lambda);
 			code.append(new ZipOperatorCodeGenerator().generate(node));
 		}
+		
+		private void visitLeaveForFoldOperator(KNaryOperatorNode node) {
+			newValueCode(node);
+			
+//			for(ParseNode child: node.getChildren()) {
+//				code.append(removeValueCode(child));
+//			}
+			
+			if(node.nChildren() == 3) {
+				code.append(removeValueCode(node.child(1)));
+			}
+			code.append(removeValueCode(node.child(0)));
+			code.append(removeValueCode(node.child(node.nChildren() - 1)));
+			
+			code.append(new FoldOperatorCodeGenerator().generate(node));
+		}
 
 		public void visitLeave(KNaryOperatorNode node) {
 			if (node.getToken().isLextant(Punctuator.FUNCTION_INVOCATION)) {
@@ -907,6 +929,8 @@ public class ASMCodeGenerator {
 				visitLeaveForReduceOperator(node);
 			} else if (node.getToken().isLextant(Keyword.ZIP)) {
 				visitLeaveForZipOperator(node);
+			} else if (node.getToken().isLextant(Keyword.FOLD)) {
+				visitLeaveForFoldOperator(node);
 			} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
 				visitLeaveForFSOperators(node);
 			}

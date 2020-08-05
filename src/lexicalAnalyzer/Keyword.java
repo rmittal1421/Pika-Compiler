@@ -36,6 +36,7 @@ public enum Keyword implements Lextant {
 	REDUCE("reduce"),
 	ZIP("zip"),
 	REVERSE("reverse"),
+	FOLD("fold"),
 	
 	// Types
 	BOOL("bool"),

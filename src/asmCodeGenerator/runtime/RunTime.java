@@ -73,6 +73,7 @@ public class RunTime {
 	public static final String NO_RETURN_IN_LAMBDA = "$$code-out-of-lambda-without-return";
 	public static final String LATER_INDEX_SMALLER_OR_EQUAL_RUNTIME_ERROR = "$$array-second-index-smaller-equal-error";
 	public static final String UNEQUAL_LENGTH_ARRAYS_ZIP_OPERATOR_ERROR = "$$unequal-length-array-zip-error";
+	public static final String EMPTY_ARRAY_GIVEN_TO_FOLD = "$$fold-operator-on-empty-array";
 
 	private ASMCodeFragment environmentASM() {
 		ASMCodeFragment result = new ASMCodeFragment(GENERATES_VOID);
@@ -165,6 +166,7 @@ public class RunTime {
 		arrayLengthNegativeError(frag);
 		lambdaWithoutReturnError(frag);
 		unequalLengthArraysZipOperatorError(frag);
+		foldOperatorOnEmptyArrayError(frag);
 
 		return frag;
 	}
@@ -510,6 +512,17 @@ public class RunTime {
 
 		frag.add(Label, UNEQUAL_LENGTH_ARRAYS_ZIP_OPERATOR_ERROR);
 		frag.add(PushD, unequalLengthArraysZipOperatorErrorMessage);
+		frag.add(Jump, GENERAL_RUNTIME_ERROR);
+	}
+	
+	public void foldOperatorOnEmptyArrayError(ASMCodeFragment frag) {
+		String foldOperatorOnEmptyArrayMessage = "$fold-operator-empty-array";
+		
+		frag.add(DLabel, foldOperatorOnEmptyArrayMessage);
+		frag.add(DataS, "Trying to apply fold operation on empty array");
+		
+		frag.add(Label, EMPTY_ARRAY_GIVEN_TO_FOLD);
+		frag.add(PushD, foldOperatorOnEmptyArrayMessage);
 		frag.add(Jump, GENERAL_RUNTIME_ERROR);
 	}
 

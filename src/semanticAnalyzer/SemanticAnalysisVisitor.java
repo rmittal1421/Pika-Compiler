@@ -503,7 +503,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 					if (lambdaType.getReturnType().equivalent(PrimitiveType.BOOLEAN)) {
 
-						// Semantically, this is a correct map operation
+						// Semantically, this is a correct reduce operation
 						node.setType(new Array(subTypeOfArray));
 						return;
 
@@ -550,7 +550,7 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 					if (!(lambdaType.getReturnType() instanceof NullType)) {
 
-						// Semantically, this is a correct map operation
+						// Semantically, this is a correct zip operation
 						node.setType(new Array(lambdaType.getReturnType()));
 						return;
 
@@ -573,6 +573,57 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		node.setType(PrimitiveType.ERROR);
 		return;
 	}
+	
+	private void visitLeaveForFoldOperator(KNaryOperatorNode node) {
+		assert node.nChildren() == 2 || node.nChildren() == 3;
+		assert node.getToken().isLextant(Keyword.FOLD);
+
+		List<Type> childTypes = new ArrayList<>();
+		for(ParseNode child: node.getChildren()) {
+			childTypes.add(child.getType());
+		}
+		
+		boolean basePresent = node.nChildren() == 3;
+		int lastChildIndex = node.nChildren() - 1;
+		
+		if (childTypes.get(0) instanceof Array && childTypes.get(lastChildIndex) instanceof Lambda) {
+			
+			Type arraySubtype = ((Array) childTypes.get(0)).getSubtype();
+			Lambda lambdaType = (Lambda) childTypes.get(lastChildIndex);
+
+			if (lambdaType.getNumberOfParameters() == 2) {
+				
+				List<Type> idealParameters = new ArrayList<>();
+				idealParameters.add(basePresent ? childTypes.get(1) : arraySubtype);
+				idealParameters.add(arraySubtype);
+				if (lambdaType.equivalentParams(idealParameters)) {
+					
+					Type idealReturnType = basePresent ? childTypes.get(1) : arraySubtype;
+					if (lambdaType.getReturnType().equivalent(idealReturnType)) {
+
+						// Semantically, this is a correct fold operation
+						node.setType(idealReturnType);
+						return;
+
+					} else {
+						FoldLambdaReturnTypeMismatchError(node);
+					}
+
+				} else {
+					FoldLambdaParamTypeMismatchArraySubTypeError(node);
+				}
+
+			} else {
+				FoldLambdaNumberOfParametersError(node);
+			}
+
+		} else {
+			typeCheckError(node, childTypes);
+		}
+
+		node.setType(PrimitiveType.ERROR);
+		return;
+	}
 
 	@Override
 	public void visitLeave(KNaryOperatorNode node) {
@@ -586,6 +637,8 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 			visitLeaveForReduceOperator(node);
 		} else if (node.getToken().isLextant(Keyword.ZIP)) {
 			visitLeaveForZipOperator(node);
+		} else if (node.getToken().isLextant(Keyword.FOLD)) {
+			visitLeaveForFoldOperator(node);
 		} else if (node.getToken().isLextant(Punctuator.ARRAY_INDEXING)) {
 			visitLeaveForFSOperator(node);
 		} else {
@@ -1089,6 +1142,25 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("Zip operator expression expects lambda's return type to be not null at " + token.getLocation());
+	}
+	
+	private void FoldLambdaNumberOfParametersError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Fold operator expression expects a lambda with exactly two parameter at " + token.getLocation());
+	}
+
+	private void FoldLambdaParamTypeMismatchArraySubTypeError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Fold operator expression's lambda didn't get expected parameters at "
+				+ token.getLocation());
+	}
+
+	private void FoldLambdaReturnTypeMismatchError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Fold operator expression's lambda didn't get expected return type at " + token.getLocation());
 	}
 
 	private void logError(String message) {

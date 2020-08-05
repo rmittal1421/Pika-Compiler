@@ -1,1 +1,5 @@
 output/
+input/pika-1/tests1
+input/pika-2/tests2
+input/pika-3/tests3
+.*

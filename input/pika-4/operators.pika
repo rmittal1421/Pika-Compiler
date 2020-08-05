@@ -13,18 +13,18 @@ func parityString <int a> -> string {
 }
 
 exec {
-	var numbers := [1,3,5,8,11,12].
+	#var numbers := [1,3,5,8,11,12].
 	
 	#var parities := numbers map parityString.
 	#print parities.
 	
-	var isOdd := <int x> -> bool {
-		return x != (x/2)*2.
-	}.
+	#var isOdd := <int x> -> bool {
+	#	return x != (x/2)*2.
+	#}.
 	
-	var oddities := numbers reduce isOdd.
-	print oddities, _n_.
-	print length oddities, _n_.
+	#var oddities := numbers reduce isOdd.
+	#print oddities, _n_.
+	#print length oddities, _n_.
 	
 	#var n1 := [1,5,3,9,2].
 	#var n2 := [2.1, -3.3, 4.2, 5.0, 17.79].
@@ -42,4 +42,29 @@ exec {
 	#var st := [[1,2], [3,4]].
 	#var reversed := reverse st.
 	#print st[0] == reversed[1], _n_.
+	
+	#var numbers := [1,5,3,9,2].
+	#var max := <rat x, int y>->rat { return 1//2. }.
+	#var catNumber := <string s, int x>->string { return s + ^ ^ + [x|char]. }.
+	#var numList := numbers fold ["list:"] catNumber.
+	#print numList, _n_.
+	#var maxity := numbers fold [1//5] max.
+	#print maxity.
+	
+	var numbers := [1,5,3,9,2].
+	var max := <int x, int y>->int { if(x > y) {return x.} else {return y.} }.
+	var catNumber := <string s, int x> -> string {
+		return s + ^ ^ + ([x + 48|char]). 
+	}.
+	var maxity := numbers fold [12] max.
+	print maxity, _n_.
+	var numList := numbers fold ["list:"] catNumber.
+	print numList, _n_.
 }
+
+
+
+
+
+
+

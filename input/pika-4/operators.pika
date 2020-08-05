@@ -56,7 +56,7 @@ exec {
 	var catNumber := <string s, int x> -> string {
 		return s + ^ ^ + ([x + 48|char]). 
 	}.
-	var maxity := numbers fold [12] max.
+	var maxity := numbers fold [^c^] max.
 	print maxity, _n_.
 	var numList := numbers fold ["list:"] catNumber.
 	print numList, _n_.

@@ -44,8 +44,12 @@ public class Parser {
 		}
 		ParseNode program = new ProgramNode(nowReading);
 		
-		while(startsFunction(nowReading)) {
-			program.appendChild(parseFunction());
+		while(startsFunction(nowReading) || startsDeclaration(nowReading)) {
+			if(startsFunction(nowReading)) {				
+				program.appendChild(parseFunction());
+			} else {
+				program.appendChild(parseDeclaration());
+			}
 		}
 
 		expect(Keyword.EXEC);

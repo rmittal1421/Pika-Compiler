@@ -12,9 +12,6 @@ exec {
 	
 	print a[^a^ - 97], _n_.
 	
-	a[0] := ^b^.
-	print a, _n_.
-	
 	const e := a[0,4][0,2].
 	print e, _n_.
 	
@@ -31,5 +28,6 @@ exec {
 	print i, _n_.
 	
 	var str := "Raghav Mittal".
-	str[0,3][0] := ^c^.
+	print str[^a^, 6].
+	
 }

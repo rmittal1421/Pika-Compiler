@@ -609,9 +609,16 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 
 			if (lambdaType.getNumberOfParameters() == 2) {
 				
+				if(basePresent && !lambdaType.getParamTypes().get(0).equivalent(childTypes.get(1))) {
+					// Try to promote the base
+					promoteNode(node, lambdaType.getParamTypes().get(0), 1);
+					childTypes.set(1, node.child(1).getType());
+				}
+				
 				List<Type> idealParameters = new ArrayList<>();
 				idealParameters.add(basePresent ? childTypes.get(1) : arraySubtype);
 				idealParameters.add(arraySubtype);
+				
 				if (lambdaType.equivalentParams(idealParameters)) {
 					
 					Type idealReturnType = basePresent ? childTypes.get(1) : arraySubtype;

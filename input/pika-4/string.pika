@@ -29,4 +29,7 @@ exec {
 	const i := h[0].
 	dealloc h.
 	print i, _n_.
+	
+	var str := "Raghav Mittal".
+	str[0,3][0] := ^c^.
 }

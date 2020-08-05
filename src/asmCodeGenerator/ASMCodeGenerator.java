@@ -792,17 +792,15 @@ public class ASMCodeGenerator {
 				childrenCode.add(removeValueCode(child));
 			}
 
-			Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
-
 			for (int i = 1; i < node.nChildren(); i++) {
+				Macros.loadIFrom(code, RunTime.STACK_POINTER); // [... SP]
 				code.add(PushI, node.child(i).getType().getSize()); // [... SP sizeOfType]
 				code.add(Subtract); // [... SP-sizeOfType] which is the location where will store our parameter
 				code.add(Duplicate); // [... nSP nSP]
+				Macros.storeITo(code, RunTime.STACK_POINTER); // [...]
 				code.append(childrenCode.get(i)); // [... nSP nSP pValue]
 				code.append(opcodeForStore(node.child(i).getType())); // [... nSP]
 			}
-
-			Macros.storeITo(code, RunTime.STACK_POINTER); // [...]
 
 			// Call the function using address from first child!
 			code.append(childrenCode.get(0)); // [... lambdaAddress]

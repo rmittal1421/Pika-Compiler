@@ -233,13 +233,29 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 				promoteNode(node, target.getType(), 1);
 			} else {
 				typeCheckError(node, Arrays.asList(target.getType(), expression.getType()));
+				node.setType(PrimitiveType.ERROR);
+				return;
 			}
+		} else if(node.child(0) instanceof KNaryOperatorNode 
+				  && node.child(0).getToken().isLextant(Punctuator.ARRAY_INDEXING)
+				  && node.child(0).getType().equivalent(PrimitiveType.STRING)) {
+			stringImmutableAssignmentError(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
+		} else if(node.child(0) instanceof BinaryOperatorNode
+				  && node.child(0).getToken().isLextant(Punctuator.ARRAY_INDEXING)
+				  && node.child(0).getType().equivalent(PrimitiveType.CHARACTER)) {
+			stringImmutableAssignmentError(node);
+			node.setType(PrimitiveType.ERROR);
+			return;
 		}
 
 		if (target instanceof IdentifierNode) {
 			IdentifierNode identifier = (IdentifierNode) target;
 			if (identifier.getBinding().getDeclareLextant() != Keyword.VAR) {
 				assignToConstError(node);
+				node.setType(PrimitiveType.ERROR);
+				return;
 			}
 		}
 
@@ -1073,6 +1089,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Token token = node.getToken();
 
 		logError("Trying to get a substring of non-string type at " + token.getLocation());
+	}
+	
+	private void stringImmutableAssignmentError(ParseNode node) {
+		Token token = node.getToken();
+
+		logError("Strings are immutable and certain characters cannot be reassigned at " + token.getLocation());
 	}
 
 	private void parameterExpectedIdentifierError(ParseNode node) {

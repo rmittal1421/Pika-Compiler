@@ -12,6 +12,7 @@ public class Scope {
 	private Scope baseScope;
 	private MemoryAllocator allocator;
 	private SymbolTable symbolTable;
+	private static int sCount = 0;
 	
 //////////////////////////////////////////////////////////////////////
 // factories
@@ -19,6 +20,10 @@ public class Scope {
 	// Program scope
 	public static Scope createProgramScope() {
 		return new Scope(programScopeAllocator(), nullInstance());
+	}
+	
+	public static Scope createExecBlockScope() {
+		return new Scope(execBlockScopeAllocator(), nullInstance());
 	}
 	
 	// Parameter scope
@@ -40,6 +45,13 @@ public class Scope {
 		return new PositiveMemoryAllocator(
 				MemoryAccessMethod.DIRECT_ACCESS_BASE, 
 				MemoryLocation.GLOBAL_VARIABLE_BLOCK);
+	}
+	
+	private static MemoryAllocator execBlockScopeAllocator() {
+		return new PositiveMemoryAllocator(
+				MemoryAccessMethod.DIRECT_ACCESS_BASE,
+				MemoryLocation.GLOBAL_VARIABLE_BLOCK2
+				);
 	}
 	
 	private MemoryAllocator parameterScopeAllocator() {
@@ -78,6 +90,9 @@ public class Scope {
 	public SymbolTable getSymbolTable() {
 		return symbolTable;
 	}
+	public static String generateStaticLexeme(String lexeme) {
+		return "#" + lexeme + "-" + sCount++;
+	}
 	
 ///////////////////////////////////////////////////////////////////////
 //memory allocation
@@ -96,13 +111,30 @@ public class Scope {
 		symbolTable.errorIfAlreadyDefined(token);
 
 		String lexeme = token.getLexeme();
-		Binding binding = allocateNewBinding(type, declareLextant, token.getLocation(), lexeme);	
+		Binding binding = allocateNewBinding(type, declareLextant, token.getLocation(), lexeme, false);	
 		symbolTable.install(lexeme, binding);
 
 		return binding;
 	}
-	private Binding allocateNewBinding(Type type, Lextant declareLextant, TextLocation textLocation, String lexeme) {
-		MemoryLocation memoryLocation = allocator.allocate(type.getSize());
+	public void createZeroByteBinding(IdentifierNode identifierNode, Binding binding) {
+		Token token = identifierNode.getToken();
+		symbolTable.errorIfAlreadyDefined(token);
+		
+		String lexeme = token.getLexeme();
+		symbolTable.install(lexeme, binding);
+	}
+	public Binding createStaticBinding(IdentifierNode identifierNode, Type type, Lextant declareLextant) {
+		Token token = identifierNode.getToken();
+		symbolTable.errorIfAlreadyDefined(token);
+		
+		String lexeme = generateStaticLexeme(token.getLexeme());
+		Binding binding = allocateNewBinding(type, declareLextant, token.getLocation(), lexeme, true);
+		symbolTable.install(lexeme, binding);
+		
+		return binding;
+	}
+	private Binding allocateNewBinding(Type type, Lextant declareLextant, TextLocation textLocation, String lexeme, boolean allocateCompanion) {
+		MemoryLocation memoryLocation = allocator.allocate(type.getSize() + (allocateCompanion ? 1 : 0));
 		return new Binding(type, declareLextant, textLocation, memoryLocation, lexeme);
 	}
 	

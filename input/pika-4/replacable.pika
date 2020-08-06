@@ -1,0 +1,7 @@
+exec {
+  static const r := 1.
+	{
+		#static const r := 2.
+		print r.
+	}
+}

@@ -6,6 +6,7 @@ func foo<int a>->null {
 const b := 2.
 
 exec {
+	var b := 10.
 	print b, _n_. 
 	const i := 1.
 	call foo(i).

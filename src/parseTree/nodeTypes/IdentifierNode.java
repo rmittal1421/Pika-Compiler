@@ -55,14 +55,14 @@ public class IdentifierNode extends ParseNode {
 			}
 			else if(current instanceof LambdaNode) {
 				// Next you should check in program node
-				return findInGlobalScope(current, identifier);
+				return lookForGlobalStaticOrFuncDefinations(current, identifier);
 			}
 		}
 		useBeforeDefineError();
 		return Binding.nullInstance();
 	}
 	
-	public Binding findInGlobalScope(ParseNode current, String identifier) {
+	public Binding lookForGlobalStaticOrFuncDefinations(ParseNode current, String identifier) {
 		for(ParseNode parentOfCurrent: current.pathToRoot()) {
 			if(parentOfCurrent instanceof ProgramNode) {
 				if(parentOfCurrent.containsBindingOf(identifier)) {
@@ -71,6 +71,14 @@ public class IdentifierNode extends ParseNode {
 				} else {
 					useBeforeDefineError();
 					return Binding.nullInstance();
+				}
+			} else {
+				if(parentOfCurrent.containsBindingOf(identifier)) {
+					declarationScope = parentOfCurrent.getScope();
+					Binding binding = parentOfCurrent.bindingOf(identifier);
+					if(binding.getIsStatic()) {
+						return binding;
+					}
 				}
 			}
 		}

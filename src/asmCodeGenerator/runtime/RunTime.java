@@ -30,6 +30,7 @@ public class RunTime {
 	public static final String LAMBDA_PRINT_STRING = "lambda-print-string";
 	public static final String RETURN_PC = "return-pc";
 	public static final String GLOBAL_MEMORY_BLOCK = "$global-memory-block";
+	public static final String GLOBAL_MEMORY_BLOCK2 = "$global-memory-block2";
 	public static final String FRAME_POINTER = "$frame-pointer";
 	public static final String STACK_POINTER = "$stack-pointer";
 	public static final String USABLE_MEMORY_START = "$usable-memory-start";

@@ -64,7 +64,7 @@ public class Parser {
 	}
 
 	private boolean startsProgram(Token token) {
-		return token.isLextant(Keyword.EXEC) || startsFunction(token);
+		return token.isLextant(Keyword.EXEC) || startsFunction(token) || startsDeclaration(token);
 	}
 	
 	private boolean startsFunction(Token token) {
@@ -329,11 +329,17 @@ public class Parser {
 		return token.isLextant(Punctuator.SEPARATOR, Punctuator.SPACE);
 	}
 
-	// declaration -> (CONST | VAR) identifier := expression .
+	// declaration ->  (CONST | VAR) identifier := expression .
 	private ParseNode parseDeclaration() {
 		if (!startsDeclaration(nowReading)) {
 			return syntaxErrorNode("declaration");
 		}
+		
+		boolean isStatic = nowReading.isLextant(Keyword.STATIC);
+		if (isStatic) {
+			readToken();
+		}
+		
 		Token declarationToken = nowReading;
 		readToken();
 
@@ -342,11 +348,11 @@ public class Parser {
 		ParseNode initializer = parseExpression();
 		expect(Punctuator.TERMINATOR);
 
-		return DeclarationNode.withChildren(declarationToken, identifier, initializer);
+		return DeclarationNode.withChildren(declarationToken, identifier, initializer, isStatic);
 	}
 
 	private boolean startsDeclaration(Token token) {
-		return token.isLextant(Keyword.CONST, Keyword.VAR);
+		return token.isLextant(Keyword.CONST, Keyword.VAR, Keyword.STATIC);
 	}
 
 	private ParseNode parseIfStatement() {
@@ -1155,12 +1161,6 @@ public class Parser {
 		readToken();
 		ParseNode identifier = new IdentifierNode(previouslyRead);
 
-//		if(nowReading.isLextant(Punctuator.OPEN_SQUARE_BRACKET)) {
-//			// We have array indexing here
-//			readToken();
-//			ParseNode index = parseExpression();
-//			expect(Punctuator.CLOSE_SQUARE_BRACKET);
-//		}
 		return identifier;
 	}
 

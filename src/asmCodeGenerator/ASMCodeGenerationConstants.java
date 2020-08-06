@@ -31,4 +31,7 @@ public class ASMCodeGenerationConstants {
 	
 	// For loop constants
 	public static final int FOR_STARTING_INDEX = 0;
+	
+	// For static variables companion
+	public static final int DO_NOT_INITIALIZE_COMPANION = 1;
 }

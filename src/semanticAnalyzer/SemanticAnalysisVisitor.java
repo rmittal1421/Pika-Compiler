@@ -81,7 +81,11 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		if (node.getParent() instanceof LambdaNode) {
 			enterProcedureScope(node);
 			return;
-		} else if (!(node.getParent() instanceof ForStatementNode)) {
+		} 
+		else if(node.getParent() instanceof ProgramNode) {
+			enterExecBlockScope(node);
+		} 
+		else if (!(node.getParent() instanceof ForStatementNode)) {
 			enterSubscope(node);
 		}
 	}
@@ -98,10 +102,14 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		Scope scope = Scope.createProgramScope();
 		node.setScope(scope);
 	}
+	
+	private void enterExecBlockScope(ParseNode node) {
+		Scope scope = Scope.createExecBlockScope();
+		node.setScope(scope);
+	}
 
 	private void enterParameterScope(ParseNode node) {
 		Scope baseScope = node.getBaseScope();
-//		Scope baseScope = node.getLocalScope();
 		Scope scope = baseScope.createParameterScope();
 		node.setScope(scope);
 	}
@@ -216,7 +224,12 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 		node.setType(declarationType);
 
 		identifier.setType(declarationType);
-		addBinding(identifier, declarationType, node.getDeclarationType());
+		
+		if(node.getIsStatic()) {
+			addStaticBinding(identifier, declarationType, node.getDeclarationType());
+		} else {			
+			addBinding(identifier, declarationType, node.getDeclarationType());
+		}
 	}
 
 	@Override
@@ -986,8 +999,13 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 				if (parent.getSequenceType().equivalent(PrimitiveType.STRING)) {
 					node.setType(PrimitiveType.CHARACTER);
 				} else {
-					Array arrayType = (Array) parent.getSequenceType();
-					node.setType(arrayType.getSubtype());
+					if(parent.getSequenceType() instanceof Array) {						
+						Array arrayType = (Array) parent.getSequenceType();
+						node.setType(arrayType.getSubtype());
+					} else {
+						node.setType(PrimitiveType.ERROR);
+						return;
+					}
 				}
 
 				addBinding(node, node.getType(), constIdentifierToken.getLextant());
@@ -1022,6 +1040,15 @@ class SemanticAnalysisVisitor extends ParseNodeVisitor.Default {
 	private void addBinding(IdentifierNode identifierNode, Type type, Lextant declareLextant) {
 		Scope scope = identifierNode.getLocalScope();
 		Binding binding = scope.createBinding(identifierNode, type, declareLextant);
+		identifierNode.setBinding(binding);
+	}
+	
+	private void addStaticBinding(IdentifierNode identifierNode, Type type, Lextant declareLextant) {
+		Scope baseScope = identifierNode.getBaseScope();
+		Scope localScope = identifierNode.getLocalScope();
+		Binding binding = baseScope.createStaticBinding(identifierNode, type, declareLextant);
+		binding.setIsStatic(true);
+		localScope.createZeroByteBinding(identifierNode, binding);
 		identifierNode.setBinding(binding);
 	}
 

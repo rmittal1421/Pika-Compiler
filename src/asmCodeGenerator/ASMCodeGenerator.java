@@ -468,17 +468,42 @@ public class ASMCodeGenerator {
 			Type type = node.getType();
 			code.append(opcodeForStore(type));
 		}
+		
+		private void updateCompanionIfZero(DeclarationNode node) {
+			if(!node.getIsStatic()) {
+				return;
+			}
+			
+			Binding binding = ((IdentifierNode) node.child(0)).getBinding();
+			binding.generateAddressForCompanion(code);         // [addressOfCompanion]
+			code.add(LoadC);                                   // [0 or 1]
+			code.add(JumpTrue, node.getSkipInitializationLable());
+			binding.generateAddressForCompanion(code);         // [addressOfCompanion]
+			code.add(PushI, ASMCodeGenerationConstants.DO_NOT_INITIALIZE_COMPANION);
+			code.add(StoreC);
+		}
+		
+		private void addSkipInitializationLabel(DeclarationNode node) {
+			if(!node.getIsStatic()) {
+				return;
+			}
+			
+			code.add(Label, node.getSkipInitializationLable());
+		}
 
 		public void visitLeave(DeclarationNode node) {
 			newVoidCode(node);
 			ASMCodeFragment lvalue = removeAddressCode(node.child(0));
 			ASMCodeFragment rvalue = removeValueCode(node.child(1));
 
+			// If node is static, code for storing should be skipped if not executed for first time.
+			updateCompanionIfZero(node);
 			code.append(lvalue);
 			code.append(rvalue);
 
 			Type type = node.getType();
 			code.append(opcodeForStore(type));
+			addSkipInitializationLabel(node);
 		}
 
 		public void visitLeave(AssignmentStatementNode node) {
@@ -904,10 +929,6 @@ public class ASMCodeGenerator {
 		
 		private void visitLeaveForFoldOperator(KNaryOperatorNode node) {
 			newValueCode(node);
-			
-//			for(ParseNode child: node.getChildren()) {
-//				code.append(removeValueCode(child));
-//			}
 			
 			if(node.nChildren() == 3) {
 				code.append(removeValueCode(node.child(1)));

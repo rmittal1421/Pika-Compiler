@@ -5,6 +5,7 @@ import asmCodeGenerator.runtime.RunTime;
 
 public class MemoryLocation {
 	public static final String GLOBAL_VARIABLE_BLOCK = RunTime.GLOBAL_MEMORY_BLOCK;
+	public static final String GLOBAL_VARIABLE_BLOCK2 = RunTime.GLOBAL_MEMORY_BLOCK2;
 	public static final String FRAME_POINTER = RunTime.FRAME_POINTER;
 	
 	private MemoryAccessMethod accessor;
@@ -36,6 +37,10 @@ public class MemoryLocation {
 	
 	public void generateAddress(ASMCodeFragment code, String comment) {
 		accessor.generateAddress(code, baseAddress, offset, comment);
+	}
+	
+	public void generateAddressForCompanion(ASMCodeFragment code, String comment, int sizeOffset) {
+		accessor.generateAddress(code, baseAddress, getOffset() + sizeOffset, comment);
 	}
 	
 	

@@ -13,6 +13,7 @@ public class Binding {
 	private MemoryLocation memoryLocation;
 	private String lexeme;
 	private Lextant declareLextant;
+	private boolean isStatic;
 	
 	public Binding(Type type, Lextant declareLextant, TextLocation location, MemoryLocation memoryLocation, String lexeme) {
 		super();
@@ -21,6 +22,7 @@ public class Binding {
 		this.textLocation = location;
 		this.memoryLocation = memoryLocation;
 		this.lexeme = lexeme;
+		this.isStatic = false;
 	}
 	
 
@@ -47,6 +49,15 @@ public class Binding {
 	}
 	public void generateAddress(ASMCodeFragment code) {
 		memoryLocation.generateAddress(code, "%% " + lexeme);
+	}
+	public void generateAddressForCompanion(ASMCodeFragment code) {
+		memoryLocation.generateAddressForCompanion(code, "%% " + lexeme + "static-companion" , getType().getSize());
+	}
+	public void setIsStatic(boolean isStatic) {
+		this.isStatic = isStatic;
+	}
+	public boolean getIsStatic() {
+		return this.isStatic;
 	}
 	
 ////////////////////////////////////////////////////////////////////////////////////

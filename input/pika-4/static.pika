@@ -1,0 +1,50 @@
+func foo<>->null {
+	print "Raghav", _n_.
+	return.
+}
+
+exec {
+	static var b := 2.
+	{
+		static var b := 1.
+		print b;.
+		var lamb := <>->null {
+			if(b == 0) {return .}
+			print b, _n_.
+			b := b - 1.
+			call foo().
+			return.
+		}.
+		call lamb().
+	}
+	print b, _n_.
+	
+	static var r := 20.
+	print r, _n_.
+	{
+		static var r := 10. 
+		print "value is: ", r, _n_.
+	}
+	
+	print "Value is : " , r, _n_.
+	
+	var i := 0.
+	while(i < 5) {
+		i := i + 1.
+		
+		static var count := 0.
+		count := count + 1.
+		print "count: ", count, _n_.
+		
+		if(i > 2) {
+			static var count2 := 0.
+			count2 := count2 + 1.
+			print "count2: ", count2, _n_.
+		}
+	}
+	
+	#{
+	#	static const r := 2.
+	#	print r.
+	#}
+}

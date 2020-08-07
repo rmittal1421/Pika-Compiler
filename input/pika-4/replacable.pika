@@ -1,7 +1,18 @@
 exec {
-  static const r := 1.
+	const arr := [1,2,3,4].
+	static const a := 1.
+	print a, _n_.
+	print arr, _n_.
+	#{
+	#	static const a := 2.
+	#	print a, _n_.
+	#}
+	
+	static const b := 3.
+	print b, _n_.
+	print arr, _n_.
 	{
-		#static const r := 2.
-		print r.
+		static const b := 4.
+		print b, _n_.
 	}
 }

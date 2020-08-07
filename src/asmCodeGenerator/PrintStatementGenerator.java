@@ -232,6 +232,7 @@ public class PrintStatementGenerator {
 		code.add(JumpPos, signHandled);                  // [...]
 		code.add(PushD, RunTime.NEGATIVE_SIGN_STRING);   
 		code.add(Printf);                                // [...]
+		Macros.loadMakePositiveStore(code, RunTime.RATIONAL_NUM);
 		code.add(Jump, signHandled);
 		
 		code.add(Label, numIsZero);                      // [... 0]

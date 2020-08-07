@@ -52,6 +52,7 @@ public class ASMCodeGenerator {
 
 		code.append(RunTime.getEnvironment());
 		code.append(globalVariableBlockASM());
+		code.append(execVariableBlockASM());
 		code.append(programASM());
 
 		// Memory heap manger goes after the main program where main program is the
@@ -68,6 +69,17 @@ public class ASMCodeGenerator {
 
 		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
 		code.add(DLabel, RunTime.GLOBAL_MEMORY_BLOCK);
+		code.add(DataZ, globalBlockSize);
+		return code;
+	}
+	
+	private ASMCodeFragment execVariableBlockASM() {
+		assert root.child(root.nChildren() - 1).hasScope();
+		Scope scope = root.child(root.nChildren() - 1).getScope();
+		int globalBlockSize = scope.getAllocatedSize();
+
+		ASMCodeFragment code = new ASMCodeFragment(GENERATES_VOID);
+		code.add(DLabel, RunTime.GLOBAL_MEMORY_BLOCK2);
 		code.add(DataZ, globalBlockSize);
 		return code;
 	}

@@ -209,7 +209,6 @@ public class FunctionSignatures extends ArrayList<FunctionSignature> {
 						PrimitiveType.BOOLEAN)
 				);
 		
-		// TODO: Make sure you undo assigning using array indexing for strings!
 		new FunctionSignatures(Punctuator.ARRAY_INDEXING, 
 				new FunctionSignature(
 					new ArrayIndexingCodeGenerator(), setS, new Array(S), PrimitiveType.INTEGER, S

@@ -1,0 +1,110 @@
+func updateRatNumbers<[rat] nums>->null {
+	for index i of nums {
+		nums[i] := nums[i] + 1.
+	}
+	return.
+}
+
+func recurseToFindGCD<int x, int y> -> int {
+	if(x == y) {
+		return x.
+	}
+	
+	if(x > y) {
+		return recurseToFindGCD(x - y, y).
+	} else {
+		return recurseToFindGCD(x, y - x).
+	}
+}
+
+func gcd<int x, int y> -> int {
+	var xT := x.
+	var yT := y.
+	if(x == 0 || y == 0) {
+		return -1.
+	} else {
+		if(x < 0) {
+			xT := x * -1.
+		} 
+		if(y < 0) {
+			yT := y * -1.
+		}
+	}
+	
+	return recurseToFindGCD(xT, yT).
+}
+
+exec {
+	print _n_, "-------- Testing call operator with rats --------", _n_.
+	const numbers := [1//2, 5//6, 9//11].
+	call updateRatNumbers(numbers).
+	print numbers, _n_.
+	
+	print _n_, "-------- Testing function invocation with multiple arguments (+ recursion) --------", _n_.
+	print recurseToFindGCD(5, 10), _n_.
+	
+	print _n_, "-------- Testing String operators --------", _n_.
+	const s1 := "".
+	var s2 := "Raghav".
+	static var s3 := "Raghav Mittal".
+	var s4 := s1 + s2 + ^ ^ + s3.
+	print "Test 1: String + Char + String", _n_.
+	print _t_, s1, _n_, _t_, s2, _n_, _t_, s3, _n_, _t_, s4, _n_, _n_.
+	
+	print "Test 2: String indexing and substring", _n_.
+	var s5 := s2 + s3[7, (^m^ - 96)].
+	print _t_, s5, _n_.
+	
+	print _t_.
+	for elem ch of s5 {
+		print ch;.
+	}
+	print _n_.
+	
+	print _n_, "Test 3: String reverse", _n_.
+	var s6 := reverse s5.
+	var i := length s5 - 1.
+	for elem el of s6 {
+		if (el != s5[i]) {
+			print _t_, "Test failed: String reverse broken", _n_.
+			break.
+		}
+	
+		i := i - 1.
+	}
+	
+	if(i == -1) {
+		print _t_, "Test passed: String reverse working", _n_.
+		i := 0.
+	}
+	
+	print _t_, s5 != s6; reverse s5 != s6; reverse s5[0, 6]; _n_.
+	
+	print _n_, "-------- Testing null Strings --------", _n_.
+	const arr := alloc [string](2).
+	#print "Raghav" + arr[0].
+	for elem i of arr[0] {
+		print i;.
+	} 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -606,8 +606,6 @@ public class ASMCodeGenerator {
 			ASMCodeFragment identifier = removeAddressCode(node.child(1));
 			ASMCodeFragment forBlock = removeVoidCode(node.child(2));
 
-			// TODO: Check for null array
-
 			// Get variables to be used throughout the loop ready
 			// Stack: []
 			code.add(PushI, ASMCodeGenerationConstants.FOR_STARTING_INDEX);
@@ -618,6 +616,9 @@ public class ASMCodeGenerator {
 
 			code.append(sequence);
 			code.add(LoadI);
+			
+			code.add(Duplicate);
+			code.add(JumpFalse, RunTime.NULL_ARRAY_RUNTIME_ERROR);
 			Macros.readIOffset(code, lengthOffset);
 			Macros.storeITo(code, RunTime.FOR_LENGTH); // Length of the array stored
 
@@ -688,6 +689,10 @@ public class ASMCodeGenerator {
 
 			code.append(sequence);
 			code.add(LoadI);
+			
+			code.add(Duplicate);
+			code.add(JumpFalse, RunTime.NULL_ARRAY_RUNTIME_ERROR);
+			
 			code.add(Duplicate);
 
 			code.add(PushI, headerOffset);

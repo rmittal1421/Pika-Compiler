@@ -1,0 +1,21 @@
+
+-------- Testing call operator with rats --------
+[1_1/2, 1_5/6, 1_9/11]
+
+-------- Testing function invocation with multiple arguments (+ recursion) --------
+5
+
+-------- Testing String operators --------
+Test 1: String + Char + String
+	
+	Raghav
+	Raghav Mittal
+	Raghav Raghav Mittal
+
+Test 2: String indexing and substring
+	RaghavMittal
+	R a g h a v M i t t a l 
+
+Test 3: String reverse
+	Test passed: String reverse working
+	true true vahgaR

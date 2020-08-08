@@ -15,7 +15,6 @@ public class CharStringConcatenationCodeGenerator implements SimpleCodeGenerator
 		ASMCodeFragment frag = new ASMCodeFragment(CodeType.GENERATES_VALUE);
 		
 		// Stack : [char string]
-//		frag.add(Exchange);                                                         // [char string]
 		frag.add(Duplicate);                                                        // [char string string]
 		frag.add(PushI, ASMCodeGenerationConstants.STRING_HEADER_SIZE);             // [char string string headerSize]
 		frag.add(Add);                                                              // [char string firstCharOfOldString]

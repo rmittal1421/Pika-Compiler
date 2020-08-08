@@ -53,12 +53,13 @@ exec {
 		print el, _n_.
 	}
 	
+	print _n_, _n_.
+	
+	print "Loop if array is null:", _n_.
 	const arr2 := alloc[[int]](1).
-	arr2[2] := [1,2,3].
-	#print "Loop on null array:", _n_.
-	#for elem el of arr2[0] {
-	#	print el;.
-	#}
+	for index el of arr2[0] {
+		print el;.
+	}
 }
 
 

@@ -14,7 +14,6 @@ public class DeclarationNode extends ParseNode {
 
 	public DeclarationNode(Token token, boolean isStatic) {
 		super(token);
-		assert(token.isLextant(Keyword.CONST, Keyword.VAR));
 		this.isStatic = isStatic;
 		
 		if(isStatic) {

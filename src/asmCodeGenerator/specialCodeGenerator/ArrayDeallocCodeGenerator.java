@@ -28,8 +28,6 @@ public class ArrayDeallocCodeGenerator implements SimpleCodeGenerator {
 		String deallocateMe = labeller.newLabel("deallocate-current-array");
 		String coreEnd = labeller.newLabel("core-end");
 
-		// FUTURE TODO: For M4, check if type id is 7 while deallocating (However, it should be taken care of by semantic checker)
-		
 		frag.add(Jump, firstCall);                                              // [arr]
 		frag.add(Label, deallocStart);                                          // [arr retP]
 		frag.add(Exchange);                                                     // [retP arr]	

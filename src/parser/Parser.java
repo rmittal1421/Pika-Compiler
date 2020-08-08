@@ -340,6 +340,10 @@ public class Parser {
 			readToken();
 		}
 		
+		if (!startsConcreteDeclaration(nowReading)) {
+			return syntaxErrorNode("declaration with const/var");
+		}
+		
 		Token declarationToken = nowReading;
 		readToken();
 
@@ -353,6 +357,10 @@ public class Parser {
 
 	private boolean startsDeclaration(Token token) {
 		return token.isLextant(Keyword.CONST, Keyword.VAR, Keyword.STATIC);
+	}
+	
+	private boolean startsConcreteDeclaration(Token token) {
+		return token.isLextant(Keyword.CONST, Keyword.VAR);
 	}
 
 	private ParseNode parseIfStatement() {
@@ -840,7 +848,6 @@ public class Parser {
 		
 		readToken();
 		
-		// TODO: Test this change
 		return KNaryOperatorNode.withChildren(invocationToken, children.toArray(new ParseNode[children.size()]));
 	}
 	
